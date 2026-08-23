@@ -1,0 +1,58 @@
+{
+  "ai": {
+    "provider": "ollama",
+    "ollama": {
+      "base_url": "http://localhost:11434",
+      "chat_model": "deepseek-r1:14b",
+      "vision_model": "qwen2.5:7b"
+    },
+    "openai": {
+      "api_key": "",
+      "base_url": "https://api.openai.com/v1",
+      "model": "gpt-4o-mini"
+    },
+    "claude": {
+      "api_key": "",
+      "model": "claude-3-5-sonnet-20241022"
+    },
+    "custom": {
+      "api_key": "",
+      "base_url": "",
+      "model": ""
+    }
+  },
+  "voice": {
+    "enabled": true,
+    "whisper_model": "small",
+    "whisper_device": "cuda",
+    "whisper_compute_type": "float16",
+    "model_cache_dir": "E:/Study_Cache/model/whisper",
+    "tts_voice": "zh-CN-XiaoxiaoNeural",
+    "tts_rate": "+0%",
+    "tts_volume": "+0%",
+    "push_to_talk_key": "ctrl"
+  },
+  "behavior": {
+    "pet_name": "小桃",
+    "proactive_enabled": true,
+    "proactive_interval_minutes": 15,
+    "emotion_system": true,
+    "auto_speak_reply": false,
+    "language": "zh-CN"
+  },
+  "pet": {
+    "position_x": 1465,
+    "position_y": 565,
+    "scale": 1.0,
+    "character": "default",
+    "always_on_top": true,
+    "opacity": 1.0
+  },
+  "plugins": {
+    "enabled": [
+      "computer_control",
+      "file_tools",
+      "wechat_tools"
+    ]
+  }
+}
