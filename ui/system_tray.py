@@ -1,87 +1,106 @@
+# -*- coding: utf-8 -*-
 """
-系统托盘图标 - 右下角常驻图标，快速访问所有功能
+系统托盘图标与全局菜单
 """
-from PyQt6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
-from PyQt6.QtGui import QIcon, QPixmap, QColor, QPainter
-from PyQt6.QtCore import Qt, QSize
+from pathlib import Path
+try:
+    from PyQt5.QtWidgets import QSystemTrayIcon, QMenu, QApplication
+    from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor
+    from PyQt5.QtCore import Qt
+except ImportError:
+    from PyQt6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
+    from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor
+    from PyQt6.QtCore import Qt
+
+ROOT_DIR = Path(__file__).parent.parent
 
 
-def _create_tray_icon() -> QIcon:
-    """生成一个简单的粉色圆形托盘图标"""
-    px = QPixmap(32, 32)
-    px.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(px)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    # 外圆
-    painter.setBrush(QColor("#ff6699"))
-    painter.setPen(Qt.PenStyle.NoPen)
+def create_fallback_icon():
+    pixmap = QPixmap(32, 32)
+    pixmap.fill(Qt.transparent if hasattr(Qt, 'transparent') else Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setBrush(QColor(255, 117, 160))
+    painter.setPen(Qt.NoPen if hasattr(Qt, 'NoPen') else Qt.PenStyle.NoPen)
     painter.drawEllipse(2, 2, 28, 28)
-    # 内部白色猫耳
-    painter.setBrush(QColor("white"))
-    painter.drawEllipse(8, 8, 6, 6)
-    painter.drawEllipse(18, 8, 6, 6)
     painter.end()
-    return QIcon(px)
+    return QIcon(pixmap)
 
 
 class SystemTray(QSystemTrayIcon):
-    """系统托盘图标"""
-
-    def __init__(self, app, pet_window, config, ai_engine, plugin_manager, save_config_fn):
-        super().__init__(app)
-        self.pet_window = pet_window
+    def __init__(self, app, pet_window, config, save_config_fn):
+        super().__init__()
+        self.app = app
+        self.pet = pet_window
         self.config = config
-        self.ai_engine = ai_engine
-        self.plugin_manager = plugin_manager
         self.save_config_fn = save_config_fn
 
-        self.setIcon(_create_tray_icon())
-        pet_name = config["behavior"].get("pet_name", "小桃")
-        self.setToolTip(f"🐱 {pet_name} - 桌面AI助手")
+        icon_path = ROOT_DIR / "assets" / "icons" / "pet_icon.png"
+        if icon_path.exists():
+            self.setIcon(QIcon(str(icon_path)))
+        else:
+            self.setIcon(create_fallback_icon())
 
-        self._build_menu()
-        self.activated.connect(self._on_activated)
+        pet_name = self.config.get("behavior", {}).get("pet_name", "桃濑日和")
+        self.setToolTip(f"{pet_name} · AI 桌面智能助理")
+        self._init_menu()
+
+        # 双击托盘图标立即唤醒并显示桌宠！
+        self.activated.connect(self._on_tray_activated)
         self.show()
 
-    def _build_menu(self):
+    def _on_tray_activated(self, reason):
+        # 单击或双击托盘图标唤醒桌宠
+        if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
+            if self.pet:
+                self.pet.show()
+                self.pet.raise_()
+                self.pet.activateWindow()
+
+    def _init_menu(self):
         menu = QMenu()
         menu.setStyleSheet("""
             QMenu {
-                background: #2d2d3f;
-                color: #ffffff;
-                border: 1px solid #5a5a8a;
-                border-radius: 8px;
-                padding: 4px;
-                font-family: "Microsoft YaHei";
+                background: rgba(22, 20, 42, 245);
+                color: #eae8f8;
+                border: 1px solid rgba(160, 130, 255, 0.35);
+                border-radius: 10px;
+                padding: 6px;
+                font-family: 'Microsoft YaHei UI';
                 font-size: 13px;
             }
-            QMenu::item { padding: 7px 22px; border-radius: 4px; }
-            QMenu::item:selected { background: #5a5aba; }
-            QMenu::separator { height: 1px; background: #5a5a8a; margin: 4px 0; }
+            QMenu::item {
+                padding: 7px 22px;
+                border-radius: 6px;
+            }
+            QMenu::item:selected {
+                background: rgba(140, 110, 255, 0.35);
+                color: #ffffff;
+            }
+            QMenu::separator {
+                height: 1px;
+                background: rgba(160, 130, 255, 0.2);
+                margin: 4px 6px;
+            }
         """)
-        pet_name = self.config["behavior"].get("pet_name", "小桃")
-        menu.addAction(f"🐱 {pet_name} 已启动").setEnabled(False)
+
+        menu.addAction("🌸 显示桌宠", self._show_pet)
+        menu.addAction("💬 开启对话", self._open_chat)
+        menu.addAction("⚙️ 控制与设置", self._open_settings)
         menu.addSeparator()
-        menu.addAction("💬 打开对话", self._open_chat)
-        menu.addAction("⚙️ 管理中心", self._open_control_panel)
-        menu.addSeparator()
-        menu.addAction("👁 显示/隐藏小人", self._toggle_pet)
-        menu.addSeparator()
-        menu.addAction("❌ 退出", QApplication.quit)
+        menu.addAction("❌ 退出程序", QApplication.quit)
+
         self.setContextMenu(menu)
 
-    def _on_activated(self, reason):
-        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
-            self._open_chat()
+    def _show_pet(self):
+        if self.pet:
+            self.pet.show()
+            self.pet.raise_()
+            self.pet.activateWindow()
 
     def _open_chat(self):
-        self.pet_window._open_chat()
+        if self.pet:
+            self.pet._open_chat()
 
-    def _open_control_panel(self):
-        self.pet_window._open_control_panel()
-
-    def _toggle_pet(self):
-        if self.pet_window.isVisible():
-            self.pet_window.hide()
-        else:
-            self.pet_window.show()
+    def _open_settings(self):
+        if self.pet and hasattr(self.pet, 'chat_window'):
+            self.pet.chat_window.open_settings()

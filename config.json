@@ -41,11 +41,11 @@
     "language": "zh-CN"
   },
   "pet": {
-    "position_x": 1465,
-    "position_y": 565,
+    "position_x": 1054,
+    "position_y": 318,
     "scale": 1.0,
     "character": "default",
-    "always_on_top": true,
+    "always_on_top": false,
     "opacity": 1.0
   },
   "plugins": {

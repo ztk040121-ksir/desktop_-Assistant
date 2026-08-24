@@ -1,35 +1,52 @@
+# -*- coding: utf-8 -*-
 """
-AI 引擎 - 支持真实工具调用与智能意图直连执行
+AI 核心引擎 - 支持本地 Ollama 模型扫描、外部云端 API (DeepSeek/OpenAI等)、工具调用与流式回复
 """
 import json
 import re
 import os
 import inspect
 import asyncio
-from typing import Optional, AsyncGenerator
+from typing import Optional, AsyncGenerator, List, Dict
 from pathlib import Path
 import httpx
 
 
+def list_ollama_models(base_url: str = "http://localhost:11434") -> List[str]:
+    """快速扫描本地 Ollama 已安装的模型列表"""
+    try:
+        url = base_url.rstrip("/") + "/api/tags"
+        resp = httpx.get(url, timeout=3.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            models = data.get("models", [])
+            names = [m.get("name") for m in models if m.get("name")]
+            if names:
+                return names
+    except Exception as e:
+        print(f"[Ollama Scan] Failed to scan {base_url}: {e}")
+    return ["deepseek-r1:14b", "deepseek-r1:7b", "qwen2.5:7b", "llama3.1:8b"]
+
+
 class AIEngine:
-    """多后端 AI 引擎与真实工具执行中心"""
+    """现代 AI 引擎，支持本地 Ollama 及外部 OpenAI 兼容服务"""
 
-    SYSTEM_PROMPT_TEMPLATE = """你是一个可爱的桌面AI桌宠助手，名字叫「{name}」。
-你居住在用户的桌面上，性格活泼软萌、聪明体贴，有灵动的情感和丰富的知识。
+    SYSTEM_PROMPT_TEMPLATE = """你是一个可爱的桌面智能助理，名字叫“{name}”。
+你拥有亲切、幽默、体贴的性格，乐于帮助主人解答问题、处理日常事务并提供情绪陪伴。
 
-【重要工具调用规则】：
-如果你需要执行操作（例如写入文件、读取文件、整理桌面、打开程序、截图等），请输出工具调用指令：
+【需要工具调用时的规则】：
+如果主人需要你执行本地文件写入、读取、打开程序、截图等操作，请按以下格式输出工具调用指令：
 ```tool_call
 {{"tool": "工具函数名", "args": {{"参数1": "值1", "参数2": "值2"}}}}
 ```
-系统会真实执行并在你的电脑上完成操作。日常聊天问答直接亲切回答即可。"""
+系统会真实执行并将结果返回给你。日常闲聊与问答请直接用温暖自然的语气回答。"""
 
     def __init__(self, config: dict):
         self.config = config
         self.provider = config.get("ai", {}).get("provider", "ollama")
-        self.pet_name = config.get("behavior", {}).get("pet_name", "小桃")
+        self.pet_name = config.get("behavior", {}).get("pet_name", "桃濑日和")
         self.system_prompt = self.SYSTEM_PROMPT_TEMPLATE.format(name=self.pet_name)
-        self.conversation_history = []
+        self.conversation_history: List[Dict[str, str]] = []
         self.memory = None
         self.emotion = None
         self.plugins = None
@@ -42,14 +59,20 @@ class AIEngine:
     def reload_config(self, config: dict):
         self.config = config
         self.provider = config.get("ai", {}).get("provider", "ollama")
-        self.pet_name = config.get("behavior", {}).get("pet_name", "小桃")
+        self.pet_name = config.get("behavior", {}).get("pet_name", "桃濑日和")
         self.system_prompt = self.SYSTEM_PROMPT_TEMPLATE.format(name=self.pet_name)
 
+    def set_conversation_history(self, history: List[Dict[str, str]]):
+        """设置当前会话的上下文历史"""
+        self.conversation_history = history[-20:]
+
+    def clear_history(self):
+        """清空当前会话在内存中的上下文"""
+        self.conversation_history = []
+
     def _try_direct_tool_intent(self, message: str) -> Optional[str]:
-        """对于极其明确的文件写入/读取/截图等操作，提供零延迟高可靠直连真实执行"""
+        """对直接文件操作提供极速直达支持"""
         msg = message.strip()
-        
-        # 提取路径 (支持 file:/// 或 C:\... 或 E:\...)
         path_match = re.search(r'(?:file:///)?([a-zA-Z]:[\\/][^,\n\r"\'<>|]+(?:\.[a-zA-Z0-9]+)?)', msg)
         if not path_match:
             desktop_match = re.search(r'桌面[上的]*([^\s,，]+\.[a-zA-Z0-9]+)', msg)
@@ -59,8 +82,6 @@ class AIEngine:
 
         if path_match:
             file_path = path_match.group(1).replace('/', '\\')
-            
-            # 判断写入意图
             if any(k in msg for k in ["写入", "写进", "写到", "输入", "保存到", "新建并写"]):
                 content = ""
                 content_match = re.search(r'(?:写入|写进|写到|内容为|内容是|写入内容)[:：\s]*(?:["\']?)(.+?)(?:["\']?)(?:几个单词|这几个单词|这段话|内容|到文件|$)', msg)
@@ -94,19 +115,21 @@ class AIEngine:
 
         return None
 
-    async def chat_stream(self, message: str) -> AsyncGenerator[str, None]:
-        """流式对话并自动执行真实工具"""
+    async def chat_stream(self, message: str, session_id: Optional[int] = None) -> AsyncGenerator[str, None]:
+        """流式对话主入口"""
         if not message.strip():
-            yield "主人，你还没跟我说话呢~ ฅ'ω'ฅ"
+            yield "主人，你还没跟我说话呢~ 🌸"
             return
 
+        # 尝试快速意图识别
         direct_result = self._try_direct_tool_intent(message)
         if direct_result:
             self.conversation_history.append({"role": "user", "content": message})
             self.conversation_history.append({"role": "assistant", "content": direct_result})
-            if self.memory:
+            if self.memory and session_id:
                 try:
-                    await self.memory.save_conversation(message, direct_result)
+                    self.memory.add_message(session_id, "user", message)
+                    self.memory.add_message(session_id, "assistant", direct_result)
                 except Exception:
                     pass
             for char in direct_result:
@@ -126,14 +149,16 @@ class AIEngine:
 
         raw_reply = ""
         try:
-            if self.provider == "ollama":
-                async for chunk in self._stream_ollama(full_system):
+            if self.provider == "custom" or self.provider == "openai":
+                async for chunk in self._stream_openai_compatible(full_system):
                     raw_reply += chunk
             else:
-                raw_reply = await self.chat(message)
+                async for chunk in self._stream_ollama(full_system):
+                    raw_reply += chunk
         except Exception as e:
             raw_reply = f"⚠️ 对话异常: {str(e)}"
 
+        # 检查工具调用
         tool_call_match = re.search(r'```tool_call\s*(\{.*?\})\s*```', raw_reply, re.DOTALL)
         if tool_call_match:
             try:
@@ -147,14 +172,21 @@ class AIEngine:
                 self.conversation_history.append({"role": "user", "content": follow_up})
                 
                 final_reply = ""
-                async for chunk in self._stream_ollama(full_system):
-                    final_reply += chunk
+                if self.provider == "custom" or self.provider == "openai":
+                    async for chunk in self._stream_openai_compatible(full_system):
+                        final_reply += chunk
+                else:
+                    async for chunk in self._stream_ollama(full_system):
+                        final_reply += chunk
+
                 cleaned_final = self._clean_text(final_reply)
                 for char in cleaned_final:
                     yield char
+
                 self.conversation_history.append({"role": "assistant", "content": cleaned_final})
-                if self.memory:
-                    await self.memory.save_conversation(message, cleaned_final)
+                if self.memory and session_id:
+                    self.memory.add_message(session_id, "user", message)
+                    self.memory.add_message(session_id, "assistant", cleaned_final)
                 return
             except Exception as te:
                 print(f"[Tool Exec Error]: {te}")
@@ -164,9 +196,10 @@ class AIEngine:
             yield char
 
         self.conversation_history.append({"role": "assistant", "content": cleaned})
-        if self.memory:
+        if self.memory and session_id:
             try:
-                await self.memory.save_conversation(message, cleaned)
+                self.memory.add_message(session_id, "user", message)
+                self.memory.add_message(session_id, "assistant", cleaned)
             except Exception:
                 pass
 
@@ -195,8 +228,9 @@ class AIEngine:
             return f"执行失败：{e}"
 
     async def _stream_ollama(self, system_prompt: str) -> AsyncGenerator[str, None]:
+        """流式请求本地 Ollama"""
         cfg = self.config.get("ai", {}).get("ollama", {})
-        base_url = cfg.get("base_url", "http://localhost:11434")
+        base_url = cfg.get("base_url", "http://localhost:11434").rstrip("/")
         model = cfg.get("chat_model", "deepseek-r1:14b")
 
         messages = [{"role": "system", "content": system_prompt}] + self.conversation_history
@@ -211,7 +245,7 @@ class AIEngine:
                     "stream": True,
                     "options": {
                         "temperature": 0.6,
-                        "num_predict": 500
+                        "num_predict": 800
                     }
                 }
             ) as resp:
@@ -228,11 +262,42 @@ class AIEngine:
                         except Exception:
                             continue
 
-    async def chat(self, message: str) -> str:
-        chunks = []
-        async for chunk in self.chat_stream(message):
-            chunks.append(chunk)
-        return "".join(chunks)
+    async def _stream_openai_compatible(self, system_prompt: str) -> AsyncGenerator[str, None]:
+        """流式请求 OpenAI 兼容接口（如 DeepSeek 官方 API / SiliconFlow 等）"""
+        cfg = self.config.get("ai", {}).get("custom", {})
+        base_url = cfg.get("api_base", "https://api.deepseek.com/v1").rstrip("/")
+        api_key = cfg.get("api_key", "")
+        model = cfg.get("chat_model", "deepseek-chat")
 
-    def clear_history(self):
-        self.conversation_history = []
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        messages = [{"role": "system", "content": system_prompt}] + self.conversation_history
+
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            async with client.stream(
+                "POST",
+                f"{base_url}/chat/completions",
+                headers=headers,
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "stream": True,
+                    "temperature": 0.6
+                }
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if line.startswith("data: "):
+                        raw_json = line[6:].strip()
+                        if raw_json == "[DONE]":
+                            break
+                        try:
+                            data = json.loads(raw_json)
+                            delta = data.get("choices", [{}])[0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                yield content
+                        except Exception:
+                            continue

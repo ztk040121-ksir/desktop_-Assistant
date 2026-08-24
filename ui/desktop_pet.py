@@ -1,18 +1,147 @@
-"""
-桌面小人窗口 - 真实肢体动作序列 (迈腿奔跑、双手举臂欢呼、抱枕侧躺睡觉、坐姿挥手)
-纯净 100% 透明绿幕级渲染，支持自主桌面奔跑漫步
-"""
-import random
 from pathlib import Path
-from PyQt6.QtWidgets import QWidget, QLabel, QMenu, QApplication
-from PyQt6.QtCore import Qt, QTimer, QPoint, QSize
-from PyQt6.QtGui import QPixmap, QGuiApplication
-
 ROOT_DIR = Path(__file__).parent.parent
+# -*- coding: utf-8 -*-
+"""
+Desktop Pet v2.0 - Live2D Interactive Keyboard & Mouse Sync Desktop Pet
+Crash-proof Thread-Safe Signal Architecture for 100% Stability
+"""
+import sys
+import random
+import threading
+import socketserver
+import time
+from http.server import SimpleHTTPRequestHandler, HTTPServer
+from pathlib import Path
+
+try:
+    from pynput import keyboard
+    HAS_PYNPUT = True
+except ImportError:
+    HAS_PYNPUT = False
+
+try:
+    from PyQt5.QtWidgets import QWidget, QMenu, QApplication
+    from PyQt5.QtCore import Qt, QTimer, QPoint, QUrl, QObject, pyqtSlot, pyqtSignal
+    from PyQt5.QtGui import QColor, QCursor
+    from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, QWebEngineSettings
+    from PyQt5.QtWebChannel import QWebChannel
+except ImportError:
+    try:
+        from PyQt6.QtWidgets import QWidget, QMenu, QApplication
+        from PyQt6.QtCore import Qt, QTimer, QPoint, QUrl, QObject, pyqtSlot, pyqtSignal
+        from PyQt6.QtGui import QColor, QCursor
+        from PyQt6.QtWebEngineWidgets import QWebEngineView
+        from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings
+        from PyQt6.QtWebChannel import QWebChannel
+    except ImportError:
+        pass
+
+CHAR_DIR = Path(__file__).parent.parent / "characters" / "default"
+HTTP_PORT = 8789
+_server_started = False
+
+
+class RobustHandler(SimpleHTTPRequestHandler):
+    protocol_version = "HTTP/1.0"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(CHAR_DIR), **kwargs)
+
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
+        super().end_headers()
+
+    def log_message(self, format, *args):
+        pass
+
+
+class RobustServer(socketserver.ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def handle_error(self, request, client_address):
+        pass
+
+
+def _ensure_server():
+    global _server_started, HTTP_PORT
+    if _server_started:
+        return HTTP_PORT
+    for port in range(8789, 8840):
+        try:
+            server = RobustServer(("127.0.0.1", port), RobustHandler)
+            t = threading.Thread(target=server.serve_forever, daemon=True)
+            t.start()
+            HTTP_PORT = port
+            _server_started = True
+            print(f"[Live2D Server] Serving models at http://127.0.0.1:{HTTP_PORT}")
+            return HTTP_PORT
+        except Exception:
+            continue
+    return HTTP_PORT
+
+
+class _SilentPage(QWebEnginePage):
+    def javaScriptConsoleMessage(self, level, msg, line, src):
+        try:
+            enc = sys.stdout.encoding or 'utf-8'
+            safe_msg = msg.encode(enc, errors='replace').decode(enc, errors='replace')
+            print(f"[Live2D Web] {safe_msg}")
+        except Exception:
+            pass
+
+
+class InputSignalBridge(QObject):
+    """Thread-safe signal bridge between background keyboard listener and Qt main thread"""
+    key_pressed = pyqtSignal()
+
+
+class PetBridge(QObject):
+    def __init__(self, pet):
+        super().__init__()
+        self._p = pet
+        self._wx = self._wy = self._sx = self._sy = 0
+
+    @pyqtSlot()
+    def onModelLoaded(self):
+        print("[Live2D] Model ready in WebGL scene!")
+
+    @pyqtSlot(int, int)
+    def onDragStart(self, sx, sy):
+        pos = self._p.pos()
+        self._wx, self._wy = pos.x(), pos.y()
+        self._sx, self._sy = sx, sy
+
+    @pyqtSlot(int, int)
+    def onDragMove(self, sx, sy):
+        self._p.move(self._wx + sx - self._sx, self._wy + sy - self._sy)
+
+    @pyqtSlot()
+    def onDragEnd(self):
+        pos = self._p.pos()
+        self._p.config.setdefault("pet", {})["position_x"] = pos.x()
+        self._p.config.setdefault("pet", {})["position_y"] = pos.y()
+        self._p.save_config_fn(self._p.config)
+
+    @pyqtSlot()
+    def onUserDoubleClick(self):
+        self._p._open_chat()
+
+    @pyqtSlot(int, int)
+    def onRightClick(self, sx, sy):
+        self._p._show_context_menu(QCursor.pos())
+
+    def trigger_action(self, action, duration=0.0):
+        self._p.web.page().runJavaScript(f"window.triggerAction('{action}', {duration});")
+
+    def trigger_emotion(self, emotion):
+        self._p.web.page().runJavaScript(f"window.triggerEmotion('{emotion}');")
 
 
 class DesktopPet(QWidget):
-    """拥有真正肢体动作的超萌桌面桌宠"""
+    """Live2D 键盘打字与鼠标同步互动桌宠 (稳定防闪退架构)"""
 
     def __init__(self, config, ai_engine, emotion_system,
                  voice_input, voice_output, save_config_fn, plugin_manager=None):
@@ -24,198 +153,151 @@ class DesktopPet(QWidget):
         self.voice_output = voice_output
         self.save_config_fn = save_config_fn
         self.plugin_manager = plugin_manager
-
         self.chat_window = None
         self.control_panel = None
-        self.drag_pos = None
+        self._last_mouse_pos = None
 
-        self._current_action = "idle"
-        self._current_frame_idx = 0
-        self._action_frames: dict[str, list[QPixmap]] = {}
-
-        # 自主奔跑漫步物理状态
-        self._is_walking = False
-        self._walk_direction = 1
-        self._walk_steps_left = 0
-
-        self.anim_timer = QTimer(self)
-        self.anim_timer.timeout.connect(self._next_frame)
-
-        self.reset_timer = QTimer(self)
-        self.reset_timer.setSingleShot(True)
-        self.reset_timer.timeout.connect(self._reset_to_idle)
-
+        _ensure_server()
+        if (ROOT_DIR / "assets" / "icons" / "pet_icon.png").exists():
+            from PyQt5.QtGui import QIcon
+            self.setWindowIcon(QIcon(str(ROOT_DIR / "assets" / "icons" / "pet_icon.png")))
         self._init_window()
-        self._load_frames()
-        self._setup_autonomous_behaviors()
+        self._init_webview()
+        self._init_channel()
+        self._load()
+        self._init_auto()
+        self._init_input_listeners()
 
-        self.emotion_system.on_emotion_change(self._on_emotion_change)
+        self.emotion_system.on_emotion_change(
+            lambda em: self.bridge.trigger_emotion(em.value)
+        )
 
-        x = config.get("pet", {}).get("position_x", 1250)
-        y = config.get("pet", {}).get("position_y", 680)
+        avail = QApplication.primaryScreen().availableGeometry()
+        default_x = max(100, avail.width() - 320)
+        default_y = max(100, avail.height() - 440)
+        x = config.get("pet", {}).get("position_x", default_x)
+        y = config.get("pet", {}).get("position_y", default_y)
+        x = max(50, min(x, avail.width() - 260))
+        y = max(50, min(y, avail.height() - 380))
         self.move(x, y)
         self.show()
+        self.raise_()
+        self.activateWindow()
 
     def _init_window(self):
-        self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.Tool
+        flag = (Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.SubWindow) if hasattr(Qt, 'FramelessWindowHint') else (
+            Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.SubWindow
         )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(130, 150)
-
-        self.pet_label = QLabel(self)
-        self.pet_label.setGeometry(0, 0, 130, 150)
-        self.pet_label.setScaledContents(True)
-        self.pet_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-    def _load_frames(self):
-        char = self.config.get("pet", {}).get("character", "default")
-        char_dir = ROOT_DIR / "characters" / char
-
-        actions = ["idle", "walk", "happy", "sleep"]
-        for act in actions:
-            act_dir = char_dir / act
-            frames = []
-            if act_dir.exists():
-                png_files = sorted(list(act_dir.glob("*.png")))
-                for pf in png_files:
-                    pix = QPixmap(str(pf))
-                    if not pix.isNull():
-                        frames.append(pix)
-            self._action_frames[act] = frames
-
-        self._play_action("idle")
-
-    def _play_action(self, action_name: str, duration_ms: int = 0):
-        if action_name not in self._action_frames or not self._action_frames[action_name]:
-            action_name = "idle"
+        self.setWindowFlags(flag)
         
-        self._current_action = action_name
-        self._current_frame_idx = 0
-        self.anim_timer.stop()
+        wa_trans = Qt.WA_TranslucentBackground if hasattr(Qt, 'WA_TranslucentBackground') else Qt.WidgetAttribute.WA_TranslucentBackground
+        self.setAttribute(wa_trans)
+        self.setFixedSize(190, 235)
 
-        # 根据动作设置真实帧率
-        if action_name == "walk":
-            interval = 95
-        elif action_name == "happy":
-            interval = 110
-        elif action_name == "sleep":
-            interval = 220
-        else:
-            interval = 135
+    def _init_webview(self):
+        self.web = QWebEngineView(self)
+        page = _SilentPage(self.web)
+        self.web.setPage(page)
+        page.setBackgroundColor(QColor(0, 0, 0, 0))
 
-        self.anim_timer.start(interval)
-        self._render_current_frame()
+        s = page.settings()
+        try:
+            s.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
+            s.setAttribute(QWebEngineSettings.JavascriptEnabled, True)
+            s.setAttribute(QWebEngineSettings.WebGLEnabled, True)
+        except Exception:
+            pass
 
-        if duration_ms > 0 and action_name != "idle":
-            self.reset_timer.stop()
-            self.reset_timer.start(duration_ms)
+        self.web.setGeometry(0, 0, 190, 235)
+        self.web.show()
 
-    def _next_frame(self):
-        frames = self._action_frames.get(self._current_action, [])
-        if not frames:
-            return
-        self._current_frame_idx = (self._current_frame_idx + 1) % len(frames)
-        self._render_current_frame()
+    def _init_channel(self):
+        self.bridge = PetBridge(self)
+        self.channel = QWebChannel()
+        self.channel.registerObject("pet", self.bridge)
+        self.web.page().setWebChannel(self.channel)
 
-        # 如果处于真实奔跑迈步状态，同步位移
-        if self._is_walking and self._current_action == "walk" and self._walk_steps_left > 0:
-            self._walk_steps_left -= 1
-            cur_pos = self.pos()
-            screen = QGuiApplication.primaryScreen().geometry()
-            new_x = cur_pos.x() + (self._walk_direction * 5)
-            # 屏幕边缘反弹
-            if new_x < 20:
-                new_x = 20
-                self._walk_direction = 1
-            elif new_x > screen.width() - 150:
-                new_x = screen.width() - 150
-                self._walk_direction = -1
-            self.move(new_x, cur_pos.y())
-            if self._walk_steps_left <= 0:
-                self._is_walking = False
-                self._play_action("idle")
+    def _load(self):
+        global HTTP_PORT
+        t = int(time.time() * 1000)
+        url = f"http://127.0.0.1:{HTTP_PORT}/renderer.html?v={t}"
+        print(f"[Live2D Pet] Loading URL: {url}")
+        self.web.setUrl(QUrl(url))
 
-    def _render_current_frame(self):
-        frames = self._action_frames.get(self._current_action, [])
-        if frames and 0 <= self._current_frame_idx < len(frames):
-            self.pet_label.setPixmap(frames[self._current_frame_idx])
+    def _init_auto(self):
+        t = QTimer(self)
+        t.setInterval(24000)
+        t.timeout.connect(self._auto)
+        t.start()
+
+    def _init_input_listeners(self):
+        # 1. Thread-safe keyboard listener with Qt Signals
+        self.signals = InputSignalBridge()
+        self.signals.key_pressed.connect(self._handle_key_pressed)
+
+        if HAS_PYNPUT:
+            try:
+                def on_press(key):
+                    self.signals.key_pressed.emit()
+
+                self._kb_listener = keyboard.Listener(on_press=on_press)
+                self._kb_listener.daemon = True
+                self._kb_listener.start()
+                print("[Input Hook] Global keyboard listener active with thread-safe signals!")
+            except Exception as e:
+                print(f"[Input Hook] Keyboard listener notice: {e}")
+
+        # 2. Main-thread QTimer for smooth 30fps mouse tracking (Crash-Proof & 0% CPU overhead)
+        self._mouse_timer = QTimer(self)
+        self._mouse_timer.setInterval(33) # ~30fps
+        self._mouse_timer.timeout.connect(self._poll_mouse_pos)
+        self._mouse_timer.start()
+
+    def _handle_key_pressed(self):
+        try:
+            self.web.page().runJavaScript("window.onGlobalKeyPress();")
+        except Exception:
+            pass
+
+    def _poll_mouse_pos(self):
+        try:
+            cur = QCursor.pos()
+            if self._last_mouse_pos == (cur.x(), cur.y()):
+                return
+            self._last_mouse_pos = (cur.x(), cur.y())
+
+            pos = self.pos()
+            cx = pos.x() + self.width() // 2
+            cy = pos.y() + self.height() // 2
+            dx = (cur.x() - cx) / 700.0
+            dy = (cur.y() - cy) / 500.0
+            norm_x = max(-1.0, min(1.0, dx))
+            norm_y = max(-1.0, min(1.0, dy))
+            self.web.page().runJavaScript(f"window.onGlobalMouseMove({norm_x:.3f}, {norm_y:.3f});")
+        except Exception:
+            pass
+
+    def _auto(self):
+        r = random.random()
+        if r < 0.35:
+            self.bridge.trigger_action("thinking", 4.0)
+        elif r < 0.70:
+            self.bridge.trigger_action("kneel", 5.0)
 
     def play_interaction(self):
-        """点击互动：双手举起欢呼雀跃跳动"""
-        self._is_walking = False
-        self._play_action("happy", duration_ms=3000)
+        acts = ["happy", "wave", "thinking"]
+        self.bridge.trigger_action(random.choice(acts), 4.0)
 
-    def _reset_to_idle(self):
-        self._is_walking = False
-        self._play_action("idle")
-
-    def _on_emotion_change(self, emotion):
-        val = emotion.value
-        if val == "happy":
-            self.play_interaction()
-        elif val == "sleepy":
-            self._play_action("sleep", duration_ms=5000)
-        elif val in self._action_frames:
-            self._play_action(val, duration_ms=3000)
-
-    def _setup_autonomous_behaviors(self):
-        """自主行为引擎：平时每隔 20 秒，小人会自动在桌面上迈步小跑一段路"""
-        self.auto_timer = QTimer(self)
-        self.auto_timer.setInterval(20000)
-        self.auto_timer.timeout.connect(self._do_random_behavior)
-        self.auto_timer.start()
-
-    def _do_random_behavior(self):
-        if self._current_action == "idle" and not self.drag_pos:
-            r = random.random()
-            if r < 0.65:
-                # 开启真实迈步小跑
-                self._is_walking = True
-                self._walk_direction = random.choice([1, -1])
-                self._walk_steps_left = random.randint(10, 20)
-                self._play_action("walk")
-            elif r < 0.85:
-                # 伸懒腰睡觉一下
-                self._play_action("sleep", duration_ms=4500)
-
-    # ── 鼠标交互 ──
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._is_walking = False
-            self.drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-        elif event.button() == Qt.MouseButton.RightButton:
-            self._show_context_menu(event.globalPosition().toPoint())
-
-    def mouseMoveEvent(self, event):
-        if self.drag_pos and event.buttons() == Qt.MouseButton.LeftButton:
-            new_pos = event.globalPosition().toPoint() - self.drag_pos
-            self.move(new_pos)
-
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            pos = self.frameGeometry().topLeft()
-            self.config["pet"]["position_x"] = pos.x()
-            self.config["pet"]["position_y"] = pos.y()
-            self.save_config_fn(self.config)
-        self.drag_pos = None
-
-    def mouseDoubleClickEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._open_chat()
-
-    def _show_context_menu(self, pos: QPoint):
+    def _show_context_menu(self, pos):
         menu = QMenu(self)
         menu.setStyleSheet("""
             QMenu {
-                background: rgba(22, 22, 38, 245);
-                color: #e8e8f8;
-                border: 1px solid rgba(140, 130, 255, 0.35);
+                background: #201c38;
+                border: 1px solid #43396f;
                 border-radius: 10px;
                 padding: 6px;
-                font-family: 'Microsoft YaHei UI';
+                color: #eae6ff;
+                font-family: 'Microsoft YaHei UI', sans-serif;
                 font-size: 13px;
             }
             QMenu::item {
@@ -223,64 +305,82 @@ class DesktopPet(QWidget):
                 border-radius: 6px;
             }
             QMenu::item:selected {
-                background: rgba(140, 120, 255, 0.35);
+                background: #4c2889;
                 color: #ffffff;
             }
             QMenu::separator {
                 height: 1px;
-                background: rgba(140, 130, 255, 0.2);
+                background: #372f5d;
                 margin: 4px 6px;
             }
         """)
-        menu.addAction("💬 打开对话", self._open_chat)
-        menu.addAction("✨ 欢呼互动", self.play_interaction)
-        menu.addAction("🏃 桌面小跑", lambda: self._start_manual_walk())
-        menu.addAction("😴 抱枕睡觉", lambda: self._play_action("sleep", duration_ms=8000))
-        menu.addSeparator()
-        menu.addAction("⚙️ 桌宠管理中心", self._open_control_panel)
-        menu.addSeparator()
-        menu.addAction("❌ 退出程序", QApplication.quit)
-        menu.exec(pos)
 
-    def _start_manual_walk(self):
-        self._is_walking = True
-        self._walk_direction = random.choice([1, -1])
-        self._walk_steps_left = 18
-        self._play_action("walk")
+        act_chat = menu.addAction("💬 开启对话")
+        act_history = menu.addAction("📜 历史会话")
+        act_settings = menu.addAction("⚙️ 设置与模型")
+        menu.addSeparator()
+        act_hide = menu.addAction("👁️ 隐藏到托盘")
+        act_quit = menu.addAction("❌ 退出程序")
+
+        action = menu.exec_(pos)
+
+        if action == act_chat:
+            self._open_chat()
+        elif action == act_history:
+            self._open_history()
+        elif action == act_settings:
+            self._open_settings()
+        elif action == act_hide:
+            self.hide()
+        elif action == act_quit:
+            QApplication.quit()
 
     def _open_chat(self):
         from ui.chat_window import ChatWindow
-        if self.chat_window is not None:
-            if self.chat_window.isMinimized():
-                self.chat_window.showNormal()
-            self.chat_window.show()
-            self.chat_window.raise_()
-            self.chat_window.activateWindow()
-        else:
+        if self.chat_window is None:
             self.chat_window = ChatWindow(
                 config=self.config,
                 ai_engine=self.ai_engine,
-                emotion_system=self.emotion_system,
-                voice_input=self.voice_input,
-                voice_output=self.voice_output,
-                pet_window=self
+                pet_window=self,
+                save_config_fn=self.save_config_fn
             )
-            self.chat_window.show()
+        self.chat_window.show()
+        self.chat_window.raise_()
+        self.chat_window.activateWindow()
+        self.chat_window._switch_view(0)
+
+    def _open_history(self):
+        self._open_chat()
+        self.chat_window._switch_view(1)
+
+    def _open_settings(self):
+        self._open_chat()
+        self.chat_window._switch_view(2)
+
+    def _open_chat(self):
+        from ui.chat_window import ChatWindow
+        if self.chat_window is None:
+            self.chat_window = ChatWindow(
+                self.config, self.ai_engine, self.emotion_system,
+                self.voice_input, self.voice_output
+            )
+        self.chat_window.show()
+        self.chat_window.raise_()
+        self.chat_window.activateWindow()
 
     def _open_control_panel(self):
-        from ui.control_panel import ControlPanel
-        if self.control_panel is not None:
-            if self.control_panel.isMinimized():
-                self.control_panel.showNormal()
-            self.control_panel.show()
-            self.control_panel.raise_()
-            self.control_panel.activateWindow()
-        else:
-            self.control_panel = ControlPanel(
-                config=self.config,
-                ai_engine=self.ai_engine,
-                save_config_fn=self.save_config_fn,
-                pet_window=self,
-                plugin_manager=self.plugin_manager
-            )
-            self.control_panel.show()
+        self._open_settings()
+
+    def _toggle_always_on_top(self, checked):
+        self.config.setdefault("pet", {})["always_on_top"] = checked
+        self.save_config_fn(self.config)
+        if (ROOT_DIR / "assets" / "icons" / "pet_icon.png").exists():
+            from PyQt5.QtGui import QIcon
+            self.setWindowIcon(QIcon(str(ROOT_DIR / "assets" / "icons" / "pet_icon.png")))
+        self._init_window()
+        self.show()
+
+
+    def mouseDoubleClickEvent(self, event):
+        self._open_chat()
+        event.accept()

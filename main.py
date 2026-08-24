@@ -1,119 +1,107 @@
-"""
-桌面 AI 桌宠 - 主入口
-项目目录: E:\Demo\desk_tools
-"""
+# -*- coding: utf-8 -*-
 import sys
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-import os
 import json
-import asyncio
-import threading
+import ctypes
 from pathlib import Path
 
-# 确保项目根目录在 Python 路径中
-ROOT_DIR = Path(__file__).parent
-sys.path.insert(0, str(ROOT_DIR))
+# 设置 Windows 任务栏应用组 ID，确保任务栏图标正常显示
+try:
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("mycompany.desktools.pet.v2")
+except Exception:
+    pass
 
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt
+try:
+    from PyQt5.QtCore import Qt
+    if hasattr(Qt, 'AA_EnableHighDpiScaling'):
+        from PyQt5.QtWidgets import QApplication
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    from PyQt5.QtWebEngineWidgets import QWebEngineView
+    from PyQt5.QtWidgets import QApplication
+    from PyQt5.QtGui import QIcon
+except ImportError:
+    try:
+        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtGui import QIcon
+    except Exception:
+        pass
 
 from core.ai_engine import AIEngine
-from core.emotion_system import EmotionSystem
 from core.memory_manager import MemoryManager
-from core.plugin_manager import PluginManager
+from core.emotion_system import EmotionSystem
 from core.voice_input import VoiceInput
 from core.voice_output import VoiceOutput
+from core.plugin_manager import PluginManager
 from ui.desktop_pet import DesktopPet
 from ui.system_tray import SystemTray
 
+ROOT_DIR = Path(__file__).parent
+CONFIG_PATH = ROOT_DIR / "config.json"
+DB_PATH = ROOT_DIR / "memory.db"
+PLUGINS_DIR = ROOT_DIR / "plugins"
+ICON_PATH = ROOT_DIR / "assets" / "icons" / "pet_icon.png"
 
-def load_config() -> dict:
-    """加载配置文件"""
-    config_path = ROOT_DIR / "config.json"
-    with open(config_path, "r", encoding="utf-8") as f:
+_GLOBAL_APP = None
+_GLOBAL_PET = None
+_GLOBAL_TRAY = None
+
+
+def load_config():
+    if not CONFIG_PATH.exists():
+        raise FileNotFoundError(f"配置文件不存在: {CONFIG_PATH}")
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def save_config(config: dict):
-    """保存配置文件"""
-    config_path = ROOT_DIR / "config.json"
-    with open(config_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
+def save_config(config_data):
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(config_data, f, ensure_ascii=False, indent=2)
 
 
-class DeskToolsApp:
-    """主应用程序管理器"""
+def main():
+    global _GLOBAL_APP, _GLOBAL_PET, _GLOBAL_TRAY
 
-    def __init__(self):
-        self.config = load_config()
-        self.save_config = save_config
+    config = load_config()
 
-        # 初始化核心组件
-        print("[AI] 初始化 AI 引擎...")
-        self.ai_engine = AIEngine(self.config)
+    _GLOBAL_APP = QApplication(sys.argv)
+    _GLOBAL_APP.setQuitOnLastWindowClosed(False)
 
-        print("[DB] 初始化记忆系统...")
-        self.memory_manager = MemoryManager(ROOT_DIR / "memory.db")
+    if ICON_PATH.exists():
+        _GLOBAL_APP.setWindowIcon(QIcon(str(ICON_PATH)))
 
-        print("[情感] 初始化情感系统...")
-        self.emotion_system = EmotionSystem()
+    memory_manager = MemoryManager(DB_PATH)
+    ai_engine = AIEngine(config)
+    emotion_system = EmotionSystem()
+    voice_input = VoiceInput(config)
+    voice_output = VoiceOutput(config)
+    plugin_manager = PluginManager(PLUGINS_DIR, config, ai_engine)
+    
+    ai_engine.set_dependencies(memory=memory_manager, emotion=emotion_system, plugins=plugin_manager)
 
-        print("[插件] 加载插件...")
-        self.plugin_manager = PluginManager(
-            ROOT_DIR / "plugins",
-            self.config,
-            self.ai_engine
-        )
-        self.plugin_manager.load_all()
+    _GLOBAL_PET = DesktopPet(
+        config=config,
+        ai_engine=ai_engine,
+        emotion_system=emotion_system,
+        voice_input=voice_input,
+        voice_output=voice_output,
+        save_config_fn=save_config,
+        plugin_manager=plugin_manager
+    )
 
-        print("[语音] 初始化语音输入...")
-        self.voice_input = VoiceInput(self.config)
+    _GLOBAL_TRAY = SystemTray(
+        app=_GLOBAL_APP,
+        pet_window=_GLOBAL_PET,
+        config=config,
+        save_config_fn=save_config
+    )
 
-        print("[TTS] 初始化语音输出...")
-        self.voice_output = VoiceOutput(self.config)
+    print("==================================================")
+    print("Desktop AI Assistant (Live2D Hiyori) Running!")
+    print("==================================================")
 
-        # 注入依赖到 AI 引擎
-        self.ai_engine.set_dependencies(
-            memory=self.memory_manager,
-            emotion=self.emotion_system,
-            plugins=self.plugin_manager
-        )
-
-        print("[OK] 所有组件初始化完成！")
-
-    def run(self):
-        """启动应用"""
-        app = QApplication(sys.argv)
-        app.setApplicationName("桌面AI桌宠")
-        app.setQuitOnLastWindowClosed(False)
-
-        # 创建桌面小人
-        self.pet_window = DesktopPet(
-            config=self.config,
-            ai_engine=self.ai_engine,
-            emotion_system=self.emotion_system,
-            voice_input=self.voice_input,
-            voice_output=self.voice_output,
-            save_config_fn=self.save_config,
-            plugin_manager=self.plugin_manager
-        )
-
-        # 创建系统托盘
-        self.tray = SystemTray(
-            app=app,
-            pet_window=self.pet_window,
-            config=self.config,
-            ai_engine=self.ai_engine,
-            plugin_manager=self.plugin_manager,
-            save_config_fn=self.save_config
-        )
-
-        print("[START] 桌宠已启动！右键小人或点击托盘图标管理")
-        sys.exit(app.exec())
+    sys.exit(_GLOBAL_APP.exec_())
 
 
 if __name__ == "__main__":
-    desk_app = DeskToolsApp()
-    desk_app.run()
+    main()

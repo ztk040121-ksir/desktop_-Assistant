@@ -11,3 +11,7 @@ env/
 *.sqlite3
 *.log
 scratch/
+test_screenshots/
+*.zip
+*.cmo3
+*.can3

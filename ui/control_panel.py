@@ -5,15 +5,15 @@ import json
 import threading
 import httpx
 from pathlib import Path
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QLabel, QLineEdit, QPushButton, QComboBox,
     QCheckBox, QSpinBox, QGroupBox,
     QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QListWidget, QListWidgetItem
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QColor
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QColor
 
 MODERN_STYLE = """
 QWidget {
@@ -130,7 +130,7 @@ class ControlPanel(QWidget):
         self.setMinimumSize(720, 600)
         # 始终置顶在最高层，确保弹出时永远在聊天窗口前面
         self.setWindowFlags(
-            Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint
+            Qt.WindowType.Window | Qt.WindowStaysOnTopHint
         )
         self.setStyleSheet(MODERN_STYLE)
 

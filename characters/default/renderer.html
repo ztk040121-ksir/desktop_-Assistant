@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Live2D Desktop Pet - Hiyori (Compact Mini)</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+}
+html, body {
+  width: 100vw;
+  height: 100vh;
+  background: transparent !important;
+  overflow: hidden;
+  cursor: default;
+}
+#canvas-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  background: transparent !important;
+}
+
+/* Compact Mini Desk at Bottom */
+#desk-stage {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 42px;
+  background: linear-gradient(180deg, #f7d8b5 0%, #e2b382 35%, #be8b56 100%);
+  border-top: 3px solid #fff2e0;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 -3px 10px rgba(90, 50, 15, 0.28);
+  pointer-events: none;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 12px 2px 12px;
+}
+
+/* Mini Keyboard */
+#mini-keyboard {
+  width: 95px;
+  height: 30px;
+  background: #2b2d42;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  padding: 2px;
+  border: 1px solid #4a4e69;
+}
+.kb-row {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+}
+.kb-key {
+  flex: 1;
+  background: #edf2f4;
+  border-radius: 1px;
+  transition: all 0.08s ease;
+}
+.kb-key.active {
+  background: #ff75a0 !important;
+  transform: translateY(1px) scale(0.95);
+  box-shadow: 0 0 5px #ff75a0;
+}
+
+/* Mini Mousepad & Mouse */
+#mini-mousepad {
+  width: 42px;
+  height: 30px;
+  background: #1d3557;
+  border-radius: 4px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
+  position: relative;
+  border: 1px solid #457b9d;
+  overflow: hidden;
+}
+#mini-mouse {
+  width: 12px;
+  height: 18px;
+  background: #f1faee;
+  border-radius: 6px 6px 4px 4px;
+  position: absolute;
+  top: 6px;
+  left: 15px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  transition: transform 0.08s cubic-bezier(0.2, 0.8, 0.3, 1), background-color 0.1s;
+  border: 1px solid #a8dadc;
+}
+#mini-mouse.clicking {
+  background: #ff75a0;
+  box-shadow: 0 0 6px #ff75a0;
+}
+#mini-mouse::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  width: 2px;
+  height: 3.5px;
+  background: #457b9d;
+  border-radius: 1px;
+}
+
+/* Compact Status Badge */
+#emotion-badge {
+  position: fixed;
+  top: 6px;
+  left: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+  font-size: 9px;
+  font-weight: bold;
+  color: #ff5e92;
+  box-shadow: 0 2px 6px rgba(255, 130, 170, 0.25);
+  pointer-events: none;
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 0.3s ease;
+  z-index: 50;
+}
+#emotion-badge.hide {
+  opacity: 0;
+  transform: translateY(-5px);
+}
+
+/* Sleep Floating ZzZ */
+#sleep-fx {
+  position: fixed;
+  top: 14px;
+  right: 15px;
+  font-size: 18px;
+  pointer-events: none;
+  display: none;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+  animation: floatZ 2.5s infinite ease-in-out;
+  z-index: 50;
+}
+@keyframes floatZ {
+  0% { opacity: 0; transform: translate(0, 5px) scale(0.7); }
+  50% { opacity: 1; transform: translate(6px, -10px) scale(1.15); }
+  100% { opacity: 0; transform: translate(12px, -22px) scale(1.35); }
+}
+
+.tap-particle {
+  position: fixed;
+  pointer-events: none;
+  font-size: 11px;
+  font-weight: bold;
+  color: #ff4081;
+  z-index: 60;
+  animation: floatTap 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+@keyframes floatTap {
+  0% { opacity: 1; transform: translate(0, 0) scale(0.7); }
+  100% { opacity: 0; transform: translate(var(--dx, 0px), -20px) scale(1.1); }
+}
+
+/* Loading */
+#loader-ui {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+  z-index: 100;
+}
+.spinner {
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid rgba(255, 160, 200, 0.25);
+  border-top: 2.5px solid rgba(255, 105, 180, 0.95);
+  border-radius: 50%;
+  animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  margin-bottom: 4px;
+}
+#loader-text {
+  color: #ff75a0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+<script>
+window.onGlobalMouseMove = function(x, y) {};
+window.onGlobalKeyPress = function(k) {};
+window.onGlobalMouseClick = function(b) {};
+window.triggerAction = function(a, d) {};
+window.triggerEmotion = function(e) {};
+window.onerror = function(msg, url, line, col, error) {
+  console.error('[Live2D Error] ' + msg + ' (' + line + ':' + col + ')');
+};
+window.onunhandledrejection = function(e) {
+  console.error('[Live2D Rejection] ' + (e.reason ? (e.reason.stack || e.reason) : e));
+};
+</script>
+
+<!-- Live2D Cubism Core -->
+<script src="libs/live2dcubismcore.min.js"></script>
+<!-- PixiJS v6 -->
+<script src="libs/pixi.min.js"></script>
+<!-- Pixi-Live2D-Display Cubism4 -->
+<script src="libs/cubism4.min.js"></script>
+<!-- QWebChannel for Python Qt integration -->
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+</head>
+<body>
+
+<div id="loader-ui">
+  <div class="spinner"></div>
+  <div id="loader-text">✨ 桃濑日和 准备中...</div>
+</div>
+
+<div id="sleep-fx">💤 z Z z</div>
+<div id="emotion-badge">💖 桃濑日和就绪</div>
+<div id="canvas-container"></div>
+
+<!-- Desk Setup Cleanly At Bottom -->
+<div id="desk-stage">
+  <div id="mini-keyboard">
+    <div class="kb-row">
+      <div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div>
+    </div>
+    <div class="kb-row">
+      <div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div>
+    </div>
+    <div class="kb-row">
+      <div class="kb-key" style="flex:2"></div><div class="kb-key" style="flex:4"></div><div class="kb-key" style="flex:2"></div>
+    </div>
+  </div>
+
+  <div id="mini-mousepad">
+    <div id="mini-mouse"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+console.log('[Live2D] Initializing Mini Compact Hiyori Pet...');
+
+if (window.PIXI && PIXI.live2d && PIXI.live2d.Live2DModel) {
+  PIXI.live2d.Live2DModel.registerTicker(PIXI.Ticker);
+}
+
+const app = new PIXI.Application({
+  view: document.createElement('canvas'),
+  autoStart: true,
+  backgroundAlpha: 0,
+  antialias: true,
+  resizeTo: window,
+  resolution: Math.min(window.devicePixelRatio || 1, 2),
+  autoDensity: true,
+});
+document.getElementById('canvas-container').appendChild(app.view);
+
+let model = null;
+let petState = 'idle'; // 'typing', 'mouse_moving', 'idle', 'sleep'
+let lastInputTime = Date.now();
+let targetMouseX = 0;
+let targetMouseY = 0;
+let currentMouseX = 0;
+let currentMouseY = 0;
+let keyElements = [];
+
+function updateStatusBadge(text) {
+  const badge = document.getElementById('emotion-badge');
+  if (badge) badge.textContent = text;
+}
+
+// Compact Layout: Scale 0.145 fits perfectly into 190x235 window
+function layoutModel() {
+  if (!model) return;
+  const w = window.innerWidth || 190;
+  const h = window.innerHeight || 235;
+
+  const targetScale = 0.145;
+  model.scale.set(targetScale, targetScale);
+  
+  model.anchor.set(0.5, 0.0);
+  model.position.set(w * 0.5, 4);
+
+  console.log(`[Live2D] Compact Layout: scale=${targetScale}, top pos=(${w*0.5}, 4)`);
+}
+
+window.addEventListener('resize', layoutModel);
+
+// Load Official Live2D Model
+const MODEL_PATH = 'live2d_model/Hiyori/Hiyori.model3.json';
+PIXI.live2d.Live2DModel.from(MODEL_PATH, {
+  autoInteract: false
+}).then(loadedModel => {
+  model = loadedModel;
+  app.stage.addChild(model);
+
+  layoutModel();
+
+  if (model.internalModel && model.internalModel.motionManager) {
+    model.internalModel.motionManager.stopAllMotions();
+  }
+
+  // Hide loader
+  const loader = document.getElementById('loader-ui');
+  if (loader) {
+    loader.style.opacity = '0';
+    setTimeout(() => loader.style.display = 'none', 400);
+  }
+
+  console.log('[Live2D] 🎉 官方桃濑日和 (精致小巧版) 已就绪!');
+  updateStatusBadge('✨ 桃濑日和已就绪');
+
+  keyElements = Array.from(document.querySelectorAll('.kb-key'));
+
+  if (window._pb && window._pb.onModelLoaded) {
+    window._pb.onModelLoaded();
+  }
+
+  // Start continuous render loop
+  app.ticker.add(updateLive2DParams);
+
+}).catch(err => {
+  console.error('[Live2D] Failed to load model:', err);
+  const text = document.getElementById('loader-text');
+  if (text) text.textContent = '❌ 加载失败: ' + err.message;
+});
+
+// Update Live2D Parameters Every Frame
+let timeElapsed = 0;
+function updateLive2DParams(delta) {
+  if (!model || !model.internalModel || !model.internalModel.coreModel) return;
+  
+  const now = Date.now();
+  const idleSec = (now - lastInputTime) / 1000;
+  timeElapsed += delta * 0.016;
+
+  // Inactivity state
+  if (idleSec > 32) {
+    if (petState !== 'sleep') {
+      petState = 'sleep';
+      document.getElementById('sleep-fx').style.display = 'block';
+      updateStatusBadge('💤 趴在桌上睡着啦~');
+    }
+  } else if (idleSec > 7) {
+    if (petState !== 'idle') {
+      petState = 'idle';
+      document.getElementById('sleep-fx').style.display = 'none';
+      updateStatusBadge('🌸 趴在桌前发呆中~');
+    }
+  }
+
+  const lerpSpeed = 0.14;
+  currentMouseX += (targetMouseX - currentMouseX) * lerpSpeed;
+  currentMouseY += (targetMouseY - currentMouseY) * lerpSpeed;
+
+  const core = model.internalModel.coreModel;
+
+  setCorePartOpacity(core, 'PartArmA', 1.0);
+  setCorePartOpacity(core, 'PartArmB', 0.0);
+
+  if (petState === 'sleep') {
+    const sleepBreath = Math.sin(timeElapsed * 1.4) * 0.1;
+    setCoreParam(core, 'ParamAngleX', Math.sin(timeElapsed * 0.4) * 4);
+    setCoreParam(core, 'ParamAngleY', -24 + sleepBreath * 8);
+    setCoreParam(core, 'ParamAngleZ', 8);
+    setCoreParam(core, 'ParamBodyAngleX', 2);
+    setCoreParam(core, 'ParamBodyAngleY', -10);
+    setCoreParam(core, 'ParamEyeLOpen', 0);
+    setCoreParam(core, 'ParamEyeROpen', 0);
+    setCoreParam(core, 'ParamMouthOpenY', 0);
+    setCoreParam(core, 'ParamBreath', 0.5 + sleepBreath);
+    
+    setCoreParam(core, 'ParamShoulder', -0.3);
+    setCoreParam(core, 'ParamArmLA', 0.2);
+    setCoreParam(core, 'ParamArmRA', 0.2);
+  } else if (petState === 'typing') {
+    const typeBob = Math.sin(now * 0.02) * 2.5;
+
+    setCoreParam(core, 'ParamAngleX', currentMouseX * 14);
+    setCoreParam(core, 'ParamAngleY', -10 + Math.abs(typeBob));
+    setCoreParam(core, 'ParamAngleZ', typeBob * 0.8);
+    setCoreParam(core, 'ParamEyeBallX', currentMouseX * 0.5);
+    setCoreParam(core, 'ParamEyeBallY', -0.5);
+    setCoreParam(core, 'ParamBodyAngleX', currentMouseX * 6);
+    setCoreParam(core, 'ParamMouthOpenY', 0.15);
+    setCoreParam(core, 'ParamBreath', 0.5 + Math.sin(timeElapsed * 3) * 0.2);
+
+    setCoreParam(core, 'ParamShoulder', -0.1);
+    setCoreParam(core, 'ParamArmLA', 0.3);
+    setCoreParam(core, 'ParamArmRA', 0.3);
+  } else {
+    const breath = Math.sin(timeElapsed * 2.0) * 0.2;
+    const wander = Math.sin(timeElapsed * 0.8) * 4;
+    
+    setCoreParam(core, 'ParamAngleX', currentMouseX * 28 + wander);
+    setCoreParam(core, 'ParamAngleY', currentMouseY * 24 - 4 + breath * 4);
+    setCoreParam(core, 'ParamAngleZ', currentMouseX * 10);
+    setCoreParam(core, 'ParamEyeBallX', currentMouseX * 0.8);
+    setCoreParam(core, 'ParamEyeBallY', currentMouseY * 0.8);
+    setCoreParam(core, 'ParamBodyAngleX', currentMouseX * 10);
+    setCoreParam(core, 'ParamBreath', 0.5 + breath);
+
+    setCoreParam(core, 'ParamShoulder', -0.2);
+    setCoreParam(core, 'ParamArmLA', 0.2);
+    setCoreParam(core, 'ParamArmRA', 0.2);
+
+    const blinkCycle = timeElapsed % 3.8;
+    if (blinkCycle < 0.15) {
+      const blinkVal = Math.sin((blinkCycle / 0.15) * Math.PI);
+      setCoreParam(core, 'ParamEyeLOpen', 1 - blinkVal);
+      setCoreParam(core, 'ParamEyeROpen', 1 - blinkVal);
+    } else {
+      setCoreParam(core, 'ParamEyeLOpen', 1);
+      setCoreParam(core, 'ParamEyeROpen', 1);
+    }
+  }
+}
+
+function setCoreParam(core, id, value) {
+  try {
+    if (core.setParameterValueById) {
+      core.setParameterValueById(id, value);
+    } else if (core.setParamFloat) {
+      core.setParamFloat(id, value);
+    }
+  } catch (e) {}
+}
+
+function setCorePartOpacity(core, id, value) {
+  try {
+    if (core.setPartOpacityById) {
+      core.setPartOpacityById(id, value);
+    } else if (core.setPartOpacity) {
+      core.setPartOpacity(id, value);
+    }
+  } catch (e) {}
+}
+
+// Global Keyboard Trigger from Python Hook
+function onGlobalKeyPress(keyName = '') {
+  lastInputTime = Date.now();
+  if (petState === 'sleep') {
+    document.getElementById('sleep-fx').style.display = 'none';
+    updateStatusBadge('✨ 醒来啦！开始打字~');
+  }
+  petState = 'typing';
+  updateStatusBadge('⌨️ 正在同步敲键盘~');
+
+  if (keyElements.length > 0) {
+    const randomKey = keyElements[Math.floor(Math.random() * keyElements.length)];
+    randomKey.classList.add('active');
+    setTimeout(() => randomKey.classList.remove('active'), 100);
+  }
+
+  if (Math.random() < 0.35) {
+    spawnTapParticle();
+  }
+}
+window.onGlobalKeyPress = onGlobalKeyPress;
+
+// Global Mouse Movement Trigger from Python Hook
+function onGlobalMouseMove(normX, normY) {
+  lastInputTime = Date.now();
+  if (petState === 'sleep') {
+    document.getElementById('sleep-fx').style.display = 'none';
+    updateStatusBadge('✨ 醒来啦！');
+  }
+  if (petState !== 'typing') {
+    petState = 'mouse_moving';
+    updateStatusBadge(normX > 0.3 ? '👉 往右看~' : normX < -0.3 ? '👈 往左看~' : '👀 跟着鼠标看~');
+  }
+
+  targetMouseX = Math.max(-1, Math.min(1, normX));
+  targetMouseY = Math.max(-1, Math.min(1, normY));
+
+  const miniMouse = document.getElementById('mini-mouse');
+  const padX = (targetMouseX * 9);
+  const padY = (targetMouseY * 6);
+  
+  if (miniMouse) {
+    miniMouse.style.transform = `translate(${padX}px, ${padY}px)`;
+  }
+}
+window.onGlobalMouseMove = onGlobalMouseMove;
+
+function onGlobalMouseClick(button = 'left') {
+  lastInputTime = Date.now();
+  const miniMouse = document.getElementById('mini-mouse');
+  if (miniMouse) {
+    miniMouse.classList.add('clicking');
+    setTimeout(() => miniMouse.classList.remove('clicking'), 120);
+  }
+  spawnTapParticle('✨');
+}
+window.onGlobalMouseClick = onGlobalMouseClick;
+
+function spawnTapParticle(symbol = '⌨️') {
+  const p = document.createElement('div');
+  p.className = 'tap-particle';
+  p.textContent = symbol;
+  p.style.left = (25 + Math.random() * 55) + 'px';
+  p.style.bottom = (42 + Math.random() * 12) + 'px';
+  p.style.setProperty('--dx', ((Math.random() - 0.5) * 24) + 'px');
+  document.body.appendChild(p);
+  setTimeout(() => p.remove(), 600);
+}
+
+// Mouse dragging & direct pet interaction
+let isDragging = false;
+document.addEventListener('mousedown', (e) => {
+  if (e.button === 0) {
+    isDragging = true;
+    onGlobalKeyPress();
+    if (window._pb && window._pb.onDragStart) {
+      window._pb.onDragStart(e.screenX, e.screenY);
+    }
+  } else if (e.button === 2) {
+    if (window._pb && window._pb.onRightClick) {
+      window._pb.onRightClick(e.screenX, e.screenY);
+    }
+  }
+  e.preventDefault();
+}, { passive: false });
+
+document.addEventListener('mousemove', (e) => {
+  if (isDragging && window._pb && window._pb.onDragMove) {
+    window._pb.onDragMove(e.screenX, e.screenY);
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if (isDragging) {
+    isDragging = false;
+    if (window._pb && window._pb.onDragEnd) {
+      window._pb.onDragEnd();
+    }
+  }
+});
+
+document.addEventListener('dblclick', (e) => {
+  onGlobalKeyPress();
+  if (window._pb && window._pb.onUserDoubleClick) {
+    window._pb.onUserDoubleClick();
+  }
+  e.preventDefault();
+});
+
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// Setup QWebChannel Transport
+function setupChannel() {
+  if (typeof QWebChannel === 'undefined' || typeof qt === 'undefined' || !qt.webChannelTransport) {
+    setTimeout(setupChannel, 150);
+    return;
+  }
+  new QWebChannel(qt.webChannelTransport, (channel) => {
+    window._pb = channel.objects.pet;
+    console.log('[Live2D] QWebChannel bridge connected successfully!');
+  });
+}
+setupChannel();
+
+</script>
+</body>
+</html>
