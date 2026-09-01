@@ -1,28 +1,42 @@
 # -*- coding: utf-8 -*-
+import os
 import sys
+
+# Configure Chromium engine parameters to use memory cache & prevent file locking
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+    "--disable-gpu-shader-disk-cache "
+    "--disable-gpu-program-cache "
+    "--disable-features=CookiesDatabase "
+    "--incognito "
+    "--disk-cache-size=1 "
+    "--media-cache-size=1 "
+    "--no-sandbox "
+    "--disable-logging"
+)
+
 import json
 import ctypes
 from pathlib import Path
 
-# 设置 Windows 任务栏应用组 ID，确保任务栏图标正常显示
+# Windows App ID
 try:
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("mycompany.desktools.pet.v2")
 except Exception:
     pass
 
 try:
-    from PyQt5.QtCore import Qt
+    from PyQt5.QtCore import Qt, QCoreApplication
     if hasattr(Qt, 'AA_EnableHighDpiScaling'):
         from PyQt5.QtWidgets import QApplication
         QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
         QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
-    from PyQt5.QtWebEngineWidgets import QWebEngineView
+    from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile
     from PyQt5.QtWidgets import QApplication
     from PyQt5.QtGui import QIcon
 except ImportError:
     try:
         from PyQt6.QtWidgets import QApplication
-        from PyQt6.QtCore import Qt
+        from PyQt6.QtCore import Qt, QCoreApplication
         from PyQt6.QtGui import QIcon
     except Exception:
         pass
@@ -40,7 +54,7 @@ ROOT_DIR = Path(__file__).parent
 CONFIG_PATH = ROOT_DIR / "config.json"
 DB_PATH = ROOT_DIR / "memory.db"
 PLUGINS_DIR = ROOT_DIR / "plugins"
-ICON_PATH = ROOT_DIR / "assets" / "icons" / "pet_icon.png"
+ICON_PATH = ROOT_DIR / "assets" / "icons" / "app_logo.png"
 
 _GLOBAL_APP = None
 _GLOBAL_PET = None
@@ -49,7 +63,7 @@ _GLOBAL_TRAY = None
 
 def load_config():
     if not CONFIG_PATH.exists():
-        raise FileNotFoundError(f"配置文件不存在: {CONFIG_PATH}")
+        raise FileNotFoundError(f"配置文件未找到: {CONFIG_PATH}")
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -64,8 +78,19 @@ def main():
 
     config = load_config()
 
+    # Set unique app name per PID to prevent Chromium database lock conflicts across processes
+    QCoreApplication.setOrganizationName("WorkBuddyAI")
+    QCoreApplication.setApplicationName(f"DeskPet_{os.getpid()}")
+
     _GLOBAL_APP = QApplication(sys.argv)
     _GLOBAL_APP.setQuitOnLastWindowClosed(False)
+
+    try:
+        profile = QWebEngineProfile.defaultProfile()
+        profile.setHttpCacheType(QWebEngineProfile.MemoryHttpCache)
+        profile.setPersistentCookiesPolicy(QWebEngineProfile.NoPersistentCookies)
+    except Exception:
+        pass
 
     if ICON_PATH.exists():
         _GLOBAL_APP.setWindowIcon(QIcon(str(ICON_PATH)))
@@ -95,9 +120,10 @@ def main():
         config=config,
         save_config_fn=save_config
     )
+    _GLOBAL_PET.tray_icon = _GLOBAL_TRAY
 
     print("==================================================")
-    print("Desktop AI Assistant (Live2D Hiyori) Running!")
+    print("Desktop AI Assistant (NovaDesk v3.0) Running!")
     print("==================================================")
 
     sys.exit(_GLOBAL_APP.exec_())

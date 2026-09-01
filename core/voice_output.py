@@ -30,13 +30,15 @@ class VoiceOutput:
 
     def speak_nowait(self, text: str):
         """完全独立的后台守护线程播放，绝不阻塞任何主线程逻辑"""
-        if not text.strip() or not self.vc.get("enabled", True):
+        if not text.strip() or not self.config.get("sound_enabled", True) or not self.vc.get("enabled", True):
             return
+
         # 限制语音长度在 150 字以内，避免长文本朗读过久
         short_text = text[:150]
-        # 去掉表情符号
+        # 去掉 Markdown 格式符号和表情符号
         import re
-        clean_text = re.sub(r'[𐀀-􏿿]', '', short_text).strip()
+        clean_text = re.sub(r'[*_#`~>|]', '', short_text)
+        clean_text = re.sub(r'[\U00010000-\U0010ffff]', '', clean_text).strip()
         if not clean_text:
             return
 
@@ -68,16 +70,31 @@ class VoiceOutput:
             finally:
                 loop.close()
 
-            # 播放
+            # 播放 MP3 (使用 Windows 原生 WMPlayer.OCX COM 播放器)
             if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
                 import subprocess
+                ps_script = f"""
+                $wmp = New-Object -ComObject WMPlayer.OCX
+                $wmp.settings.volume = 100
+                $wmp.URL = '{tmp_path}'
+                $wmp.controls.play()
+                $waited = 0
+                while ($wmp.playState -eq 0 -or $wmp.playState -eq 1 -or $wmp.playState -eq 2) {{
+                    if ($waited -gt 20) {{ break }}
+                    Start-Sleep -Milliseconds 100
+                    $waited++
+                }}
+                while ($wmp.playState -eq 3 -or $wmp.playState -eq 6 -or $wmp.playState -eq 7 -or $wmp.playState -eq 9) {{
+                    Start-Sleep -Milliseconds 100
+                }}
+                """
                 subprocess.run(
-                    ["powershell", "-c", f"(New-Object Media.SoundPlayer '{tmp_path}').PlaySync()"],
+                    ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script],
                     capture_output=True,
                     timeout=15
                 )
         except Exception as e:
-            pass  # 语音失败静默处理，不影响文本体验
+            print(f"[VoiceOutput Error] {e}")
         finally:
             self._lock.release()
             if tmp_path and os.path.exists(tmp_path):

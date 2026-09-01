@@ -1,0 +1,43 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<script src="libs/pixi.min.js"></script>
+<script src="libs/live2dcubismcore.min.js"></script>
+<script src="libs/cubism4.min.js"></script>
+</head>
+<body style="background: #222;">
+<div id="container"></div>
+<script>
+async function init() {
+  const app = new PIXI.Application({
+    width: 205,
+    height: 305,
+    backgroundAlpha: 0,
+    antialias: true
+  });
+  document.getElementById('container').appendChild(app.view);
+
+  const model = await PIXI.live2d.Live2DModel.from('live2d_model/HiyoriPro/hiyori_pro_t11.model3.json');
+  model.scale.set(0.145);
+  model.position.set(102, 72);
+  app.stage.addChild(model);
+
+  console.log('[Test] Model loaded! Hooking motionManager.update...');
+
+  // Hook motionManager
+  const origUpdate = model.internalModel.motionManager.update.bind(model.internalModel.motionManager);
+  model.internalModel.motionManager.update = function(coreModel, now) {
+    const res = origUpdate(coreModel, now);
+    // Force eye to right and angle to 30
+    coreModel.setParameterValueByIndex(coreModel.getParameterIndex('ParamAngleX'), 30);
+    coreModel.setParameterValueByIndex(coreModel.getParameterIndex('ParamEyeBallX'), 1.0);
+    return res;
+  };
+  
+  console.log('[Test] Hook installed successfully!');
+}
+init();
+</script>
+</body>
+</html>

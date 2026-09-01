@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Hands Y-Offset Debugger</title>
+<style>
+body { background: #1a1a2e; color: #fff; font-family: monospace; margin: 0; }
+.controls { position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.8); padding: 14px; border-radius: 10px; z-index: 9999; width: 220px; }
+.controls label { display: block; margin: 6px 0 2px; font-size: 12px; color: #aaa; }
+.controls input[type=range] { width: 100%; }
+.val { color: #f0a; font-weight: bold; }
+#preview { width: 190px; height: 60px; border: 2px solid #a855f7; position: absolute; left: 50%; transform: translateX(-50%); top: 200px; overflow: hidden; background: transparent; }
+iframe { width: 190px; height: 300px; border: none; position: absolute; top: 0; left: 0; }
+</style>
+</head>
+<body>
+<div class="controls">
+  <b style="color:#c084fc">Hands Y-Offset Tuner</b><br><br>
+  <label>Window Y offset (iframe top): <span class="val" id="v_top">-145px</span></label>
+  <input type="range" id="r_top" min="-300" max="0" value="-145" step="5">
+  <br>
+  <label>Preview window height: <span class="val" id="v_h">60px</span></label>
+  <input type="range" id="r_h" min="30" max="150" value="60" step="5">
+  <br><br>
+  <b>iframe src offset (model Y):</b><br>
+  <label>model.position.y: <span class="val" id="v_model">-145</span></label>
+  <input type="range" id="r_model" min="-300" max="100" value="-145" step="5">
+  <br><br>
+  <button onclick="applyToIframe()" style="background:#7c3aed;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer">Apply to iframe</button>
+  <br><br>
+  <div style="color:#0f8; font-size:12px">Current values:<br>
+  iframe top: <span id="show_top">-145</span>px<br>
+  window H: <span id="show_h">60</span>px<br>
+  model Y: <span id="show_model">-145</span>
+  </div>
+</div>
+
+<div style="position:relative; width:190px; margin: 50px auto;">
+  <div style="background:#333; width:190px; height:235px; position:relative; border:1px solid #555;">
+    <div style="position:absolute;bottom:0;left:0;right:0;color:#888;font-size:10px;text-align:center">main window (190x235)</div>
+    <iframe id="main_frame" src="http://127.0.0.1:8789/renderer.html?v=1"></iframe>
+  </div>
+  <div id="preview_box" style="width:190px; height:60px; border:2px solid #a855f7; overflow:hidden; position:relative; background:rgba(168,85,247,0.1);">
+    <div style="position:absolute;top:0;left:0;right:0;color:#a855f7;font-size:9px;text-align:center;z-index:99">hands overlay</div>
+    <iframe id="hands_frame" src="http://127.0.0.1:8789/renderer.html?mode=hands&v=2" style="width:190px; height:235px; border:none; position:absolute; top:-145px; left:0;"></iframe>
+  </div>
+</div>
+
+<script>
+function update() {
+  const top = parseInt(document.getElementById('r_top').value);
+  const h = parseInt(document.getElementById('r_h').value);
+  const model_y = parseInt(document.getElementById('r_model').value);
+  
+  document.getElementById('v_top').textContent = top + 'px';
+  document.getElementById('v_h').textContent = h + 'px';
+  document.getElementById('v_model').textContent = model_y;
+  
+  document.getElementById('show_top').textContent = top;
+  document.getElementById('show_h').textContent = h;
+  document.getElementById('show_model').textContent = model_y;
+  
+  document.getElementById('preview_box').style.height = h + 'px';
+  document.getElementById('hands_frame').style.top = top + 'px';
+}
+
+function applyToIframe() {
+  const model_y = parseInt(document.getElementById('r_model').value);
+  const t = Date.now();
+  document.getElementById('hands_frame').src = `http://127.0.0.1:8789/renderer.html?mode=hands&modelY=${model_y}&v=${t}`;
+}
+
+document.getElementById('r_top').addEventListener('input', update);
+document.getElementById('r_h').addEventListener('input', update);
+document.getElementById('r_model').addEventListener('input', update);
+</script>
+</body>
+</html>

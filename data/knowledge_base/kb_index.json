@@ -1,0 +1,42 @@
+{
+  "documents": [
+    {
+      "name": "config.json",
+      "path": "E:\\Demo\\desk_tools\\config.json",
+      "chunk_count": 5,
+      "size_kb": 1.7
+    }
+  ],
+  "chunks": [
+    {
+      "doc_name": "config.json",
+      "doc_path": "E:\\Demo\\desk_tools\\config.json",
+      "chunk_id": 0,
+      "text": "{\n  \"ai\": {\n    \"provider\": \"custom\",\n    \"ollama\": {\n      \"base_url\": \"http://localhost:11434\",\n      \"chat_model\": \"deepseek-r1:14b\",\n      \"vision_model\": \"qwen2.5:7b\"\n    },\n    \"openai\": {\n      \"api_key\": \"\",\n      \"base_url\": \"https://api.openai.com/v1\",\n      \"model\": \"gpt-4o-mini\"\n    },\n    \"claude\": {\n      \"api_key\": \"\",\n      \"model\": \"claude-3-5-sonnet-20241022\"\n    },"
+    },
+    {
+      "doc_name": "config.json",
+      "doc_path": "E:\\Demo\\desk_tools\\config.json",
+      "chunk_id": 1,
+      "text": "\"model\": \"claude-3-5-sonnet-20241022\"\n    },\n    \"custom\": {\n      \"api_key\": \"sk-1FEAUBAdC6ee71Eaf9a3T3BLbkFJ6756Bd2A1B6B40B8aa77\",\n      \"base_url\": \"\",\n      \"model\": \"\",\n      \"api_base\": \"https://api.ohmygpt.com/v1\",\n      \"chat_model\": \"deepseek:deepseek/deepseek-v4-flash-vision-exp\"\n    }\n  },\n  \"voice\": {\n    \"enabled\": true,\n    \"whisper_model\": \"small\","
+    },
+    {
+      "doc_name": "config.json",
+      "doc_path": "E:\\Demo\\desk_tools\\config.json",
+      "chunk_id": 2,
+      "text": "\"enabled\": true,\n    \"whisper_model\": \"small\",\n    \"whisper_device\": \"cuda\",\n    \"whisper_compute_type\": \"float16\",\n    \"model_cache_dir\": \"E:/Study_Cache/model/whisper\",\n    \"tts_voice\": \"zh-CN-XiaoxiaoNeural\",\n    \"tts_rate\": \"+0%\",\n    \"tts_volume\": \"+0%\",\n    \"push_to_talk_key\": \"ctrl\"\n  },\n  \"behavior\": {\n    \"pet_name\": \"春日\",\n    \"proactive_enabled\": true,"
+    },
+    {
+      "doc_name": "config.json",
+      "doc_path": "E:\\Demo\\desk_tools\\config.json",
+      "chunk_id": 3,
+      "text": "\"pet_name\": \"春日\",\n    \"proactive_enabled\": true,\n    \"proactive_interval_minutes\": 15,\n    \"emotion_system\": true,\n    \"auto_speak_reply\": false,\n    \"language\": \"zh-CN\",\n    \"sound_enabled\": false\n  },\n  \"pet\": {\n    \"position_x\": 918,\n    \"position_y\": 166,\n    \"scale\": 1.0,\n    \"character\": \"default\",\n    \"always_on_top\": false,\n    \"opacity\": 1.0\n  },\n  \"plugins\": {\n    \"enabled\": ["
+    },
+    {
+      "doc_name": "config.json",
+      "doc_path": "E:\\Demo\\desk_tools\\config.json",
+      "chunk_id": 4,
+      "text": "pacity\": 1.0\n  },\n  \"plugins\": {\n    \"enabled\": [\n      \"pet_controller\",\n      \"amap_life_tools\",\n      \"web_search_news\",\n      \"computer_control\",\n      \"file_tools\",\n      \"wechat_tools\",\n      \"github_tools\",\n      \"ppt_tools\",\n      \"knowledge_base_tools\",\n      \"creative_article_tools\"\n    ]\n  }\n}"
+    }
+  ]
+}

@@ -1,140 +1,270 @@
+# -*- coding: utf-8 -*-
 """
-电脑控制工具集 - 鼠标/键盘控制、截图、打开程序、文件搜索
-使用 @register_tool 注册的工具可以直接被小人调用
+全能电脑与桌面日常高效控制工具集 (Desktop Automation & System Assistant)
+支持常用软件极速启停、音量调节、静音、锁屏、截屏、清空回收站、桌面/近期文件智能查找等。
 """
 import os
 import subprocess
-import glob
+import ctypes
+import shutil
 from pathlib import Path
+from datetime import datetime, timedelta
+from typing import List, Optional, Dict
 from core.plugin_manager import register_tool
 
 
-@register_tool(description="截取当前屏幕截图，保存到桌面并返回路径")
+def _scan_all_shortcuts() -> Dict[str, str]:
+    """扫描 Windows 开始菜单与桌面上的所有快捷方式 (.lnk)"""
+    start_menus = [
+        Path(os.environ.get("APPDATA", "")) / r"Microsoft\Windows\Start Menu\Programs",
+        Path(os.environ.get("PROGRAMDATA", "")) / r"Microsoft\Windows\Start Menu\Programs",
+        Path.home() / "Desktop",
+        Path.home() / "Desktop" / "饭碗",
+        Path(os.environ.get("PUBLIC", "")) / "Desktop"
+    ]
+    apps = {}
+    for sm in start_menus:
+        if not sm.exists():
+            continue
+        for lnk in sm.rglob("*.lnk"):
+            clean_stem = lnk.stem.lower().replace(" - 快捷方式", "").replace("快捷方式", "").strip()
+            apps[clean_stem] = str(lnk)
+            # 兼容英文别名
+            if "wechat" in clean_stem:
+                apps["微信"] = str(lnk)
+                apps["wechat"] = str(lnk)
+            elif "visual studio code" in clean_stem or "code" in clean_stem:
+                apps["vscode"] = str(lnk)
+                apps["vs code"] = str(lnk)
+            elif "cloudmusic" in clean_stem or "网易云" in clean_stem:
+                apps["网易云音乐"] = str(lnk)
+                apps["网易云"] = str(lnk)
+            elif "qqmusic" in clean_stem or "qq音乐" in clean_stem:
+                apps["qq音乐"] = str(lnk)
+            elif "汽水音乐" in clean_stem:
+                apps["汽水音乐"] = str(lnk)
+    return apps
+
+
+@register_tool(description="截取当前屏幕截图，保存到桌面并打开图片预览")
 def take_screenshot() -> str:
+    """屏幕截图"""
     try:
-        import pyautogui
-        from datetime import datetime
         desktop = Path.home() / "Desktop"
-        filename = f"截图_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        filename = f"日和截图_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         save_path = desktop / filename
-        screenshot = pyautogui.screenshot()
-        screenshot.save(str(save_path))
-        return f"✅ 截图已保存到桌面：{filename}"
+        
+        captured = False
+        try:
+            import pyautogui
+            screenshot = pyautogui.screenshot()
+            screenshot.save(str(save_path))
+            captured = True
+        except Exception:
+            pass
+
+        if not captured:
+            # 唤起 Windows 截图快捷键
+            subprocess.Popen(["explorer.exe", "ms-screenclip:"])
+            return "📸 已为你唤起 Windows 原生快速截图工具 (Win+Shift+S)，请框选截图区域~ 🌸"
+
+        # 打开截图文件
+        try:
+            os.startfile(str(save_path))
+        except Exception:
+            pass
+
+        return f"📸 截图已成功保存到桌面：`{filename}` 并已为你打开预览！🌸"
     except Exception as e:
-        return f"截图失败：{e}"
+        return f"❌ 截图失败：{e}"
 
 
-@register_tool(description="打开指定的应用程序或文件，参数为应用名称或路径")
+@register_tool(description="打开常用的电脑应用程序。参数：app_name(软件名称，如'微信'、'网易云音乐'、'VS Code'、'vscode'、'QQ音乐'、'汽水音乐'、'浏览器'、'记事本'、'计算器'、'任务管理器')")
 def open_application(app_name: str) -> str:
-    """
-    支持：微信、记事本、计算器、浏览器、文件路径等
-    """
-    app_map = {
-        "微信": r"C:\Program Files (x86)\Tencent\WeChat\WeChat.exe",
-        "钉钉": r"C:\Program Files\DingDing\DingTalk.exe",
+    """极速启动指定应用程序"""
+    app_clean = app_name.strip().lower()
+    
+    # 1. 扫描系统快捷方式表 (.lnk)
+    shortcut_map = _scan_all_shortcuts()
+    for name, lnk_path in shortcut_map.items():
+        if app_clean == name or app_clean in name or name in app_clean:
+            try:
+                os.startfile(lnk_path)
+                return f"✅ 已成功启动：{app_name} 🌸"
+            except Exception:
+                pass
+
+    # 2. 系统内置应用表
+    sys_apps = {
         "记事本": "notepad.exe",
         "计算器": "calc.exe",
+        "任务管理器": "taskmgr.exe",
         "画图": "mspaint.exe",
+        "命令行": "cmd.exe",
+        "终端": "cmd.exe",
         "资源管理器": "explorer.exe",
-        "命令提示符": "cmd.exe",
-        "浏览器": r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        "浏览器": "https://www.baidu.com"
     }
-    target = app_map.get(app_name, app_name)
-    try:
-        if os.path.exists(target):
-            subprocess.Popen([target])
-        else:
-            os.startfile(target)
-        return f"✅ 已打开：{app_name}"
-    except Exception as e:
-        return f"打开失败：{e}"
+    for k, v in sys_apps.items():
+        if k in app_clean or app_clean in k:
+            try:
+                os.startfile(v)
+                return f"✅ 已成功启动：{app_name} 🌸"
+            except Exception:
+                pass
 
-
-@register_tool(description="在电脑上搜索文件，参数为文件名或关键词，返回找到的文件路径列表")
-def search_files(keyword: str, search_dir: str = "C:/") -> str:
-    try:
-        results = []
-        # 搜索用户常用目录（不全盘搜索，太慢）
-        search_paths = [
-            Path.home() / "Desktop",
-            Path.home() / "Documents",
-            Path.home() / "Downloads",
-            Path("D:/"),
-            Path("E:/"),
+    # 3. 常见路径探测
+    username = os.getenv("USERNAME", "Administrator")
+    hardcoded_candidates = {
+        "微信": [
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\微信\微信.lnk",
+            r"C:\Program Files\Tencent\WeChat\WeChat.exe",
+            r"C:\Program Files (x86)\Tencent\WeChat\WeChat.exe",
+            "weixin:"
+        ],
+        "vs code": [
+            r"E:\Study_Cache\visual_studio\Microsoft VS Code\Code.exe",
+            rf"C:\Users\{username}\AppData\Local\Programs\Microsoft VS Code\Code.exe",
+            "code"
         ]
-        for base in search_paths:
+    }
+    for k, paths in hardcoded_candidates.items():
+        if k in app_clean or app_clean in k:
+            for p in paths:
+                try:
+                    if os.path.exists(p) or p.startswith("weixin:"):
+                        os.startfile(p)
+                        return f"✅ 已成功启动：{app_name} 🌸"
+                except Exception:
+                    continue
+
+    try:
+        os.startfile(app_name)
+        return f"✅ 已尝试为你启动：{app_name} 🌸"
+    except Exception:
+        return f"❌ 未能找到【{app_name}】的快捷方式或安装路径，请确认是否已安装或放在桌面。"
+
+
+@register_tool(description="控制电脑系统音量与静音。参数：action(可选: 'up'增大音量, 'down'减小音量, 'mute'一键静音/取消静音)")
+def control_system_volume(action: str = "up") -> str:
+    """控制电脑音量"""
+    try:
+        act = action.lower()
+        if "静音" in act or act == "mute":
+            ctypes.windll.user32.keybd_event(0xAD, 0, 0, 0)
+            ctypes.windll.user32.keybd_event(0xAD, 0, 2, 0)
+            return "🔇 已为你切换电脑静音状态！🌸"
+        elif "小" in act or "减" in act or act == "down":
+            for _ in range(4):
+                ctypes.windll.user32.keybd_event(0xAE, 0, 0, 0)
+                ctypes.windll.user32.keybd_event(0xAE, 0, 2, 0)
+            return "🔉 已为你调小电脑音量~"
+        else:
+            for _ in range(4):
+                ctypes.windll.user32.keybd_event(0xAF, 0, 0, 0)
+                ctypes.windll.user32.keybd_event(0xAF, 0, 2, 0)
+            return "🔊 已为你调大电脑音量！🌸"
+    except Exception as e:
+        return f"❌ 音量调节失败: {e}"
+
+
+@register_tool(description="一键锁定电脑屏幕(Lock Screen)")
+def lock_screen() -> str:
+    """锁屏"""
+    try:
+        ctypes.windll.user32.LockWorkStation()
+        return "🔒 电脑屏幕已成功锁定！主人外出记得注意安全哦~ 🌸"
+    except Exception as e:
+        return f"❌ 锁屏失败: {e}"
+
+
+@register_tool(description="一键清空 Windows 系统的回收站，释放磁盘垃圾空间")
+def empty_recycle_bin() -> str:
+    """清空回收站"""
+    try:
+        flags = 7
+        ctypes.windll.shell32.SHEmptyRecycleBinW(None, None, flags)
+        return "🗑️ 回收站已彻底清空，电脑又变得干干净净啦！🌸"
+    except Exception as e:
+        return f"❌ 清空回收站失败: {e}"
+
+
+@register_tool(description="智能查找电脑桌面与常用目录中的最近文件。参数：keyword(关键词)，time_range(可选: 'yesterday'昨天, 'today'今天, 'week'本周, 'all'全部)，file_type(可选: 'excel'表格, 'word'文档, 'pdf', 'image'图片, 'all'全部)")
+def find_recent_files(keyword: str = "", time_range: str = "all", file_type: str = "all") -> str:
+    """智能文件查找"""
+    try:
+        search_dirs = [
+            Path.home() / "Desktop",
+            Path.home() / "Desktop" / "饭碗",
+            Path.home() / "Downloads",
+            Path.home() / "Documents",
+            Path("E:/Demo"),
+            Path("D:/Demo")
+        ]
+        
+        now = datetime.now()
+        yesterday_start = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday_end = (now - timedelta(days=1)).replace(hour=23, minute=59, second=59, microsecond=999999)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = now - timedelta(days=7)
+
+        ext_map = {
+            "excel": [".xlsx", ".xls", ".csv"],
+            "word": [".docx", ".doc"],
+            "pdf": [".pdf"],
+            "ppt": [".pptx", ".ppt"],
+            "image": [".png", ".jpg", ".jpeg", ".webp"],
+            "code": [".py", ".html", ".js", ".json", ".css"]
+        }
+        target_exts = ext_map.get(file_type.lower(), None)
+
+        found = []
+        for base in search_dirs:
             if not base.exists():
                 continue
-            for p in base.rglob(f"*{keyword}*"):
-                results.append(str(p))
-                if len(results) >= 10:
-                    break
-            if len(results) >= 10:
-                break
+            try:
+                for p in base.glob("*"):
+                    if p.is_file():
+                        if target_exts and p.suffix.lower() not in target_exts:
+                            continue
+                        if keyword and keyword.lower() not in p.name.lower():
+                            continue
+                        
+                        mtime = datetime.fromtimestamp(p.stat().st_mtime)
+                        if time_range == "yesterday" and not (yesterday_start <= mtime <= yesterday_end):
+                            continue
+                        elif time_range == "today" and not (mtime >= today_start):
+                            continue
+                        elif time_range == "week" and not (mtime >= week_start):
+                            continue
 
-        if not results:
-            return f"未找到包含「{keyword}」的文件"
-        return "找到以下文件：\n" + "\n".join(results[:10])
+                        size_kb = round(p.stat().st_size / 1024, 1)
+                        found.append((p.name, str(p), mtime.strftime("%Y-%m-%d %H:%M"), f"{size_kb} KB"))
+            except Exception:
+                continue
+
+        if not found:
+            return f"🔍 在桌面及常用目录中暂未找到符合条件的文件（关键词: '{keyword}', 时间: {time_range}, 类型: {file_type}）"
+
+        found.sort(key=lambda x: x[2], reverse=True)
+        lines = [f"📂 【为你找到的 {len(found[:6])} 个相关文件】："]
+        for idx, (name, path_str, mt, sz) in enumerate(found[:6]):
+            lines.append(f"{idx+1}. **{name}** ({sz} | 修改于 {mt})\n   📁 路径：`{path_str}`")
+
+        lines.append("\n💡 主人需要我帮你直接打开哪个文件吗？说「帮我打开第1个文件」或者告诉我名字即可！🌸")
+        return "\n\n".join(lines)
     except Exception as e:
-        return f"搜索失败：{e}"
+        return f"❌ 查找文件失败: {e}"
 
 
-@register_tool(description="打开指定的文件夹，参数为文件夹路径")
-def open_folder(folder_path: str) -> str:
+@register_tool(description="打开指定路径的本地文件或文件夹。参数：file_path(完整文件路径)")
+def open_file_path(file_path: str) -> str:
+    """打开文件或文件夹"""
     try:
-        path = Path(folder_path)
-        if not path.exists():
-            return f"文件夹不存在：{folder_path}"
-        os.startfile(str(path))
-        return f"✅ 已打开文件夹：{folder_path}"
+        p = Path(file_path.strip().strip('"').strip("'"))
+        if not p.exists():
+            return f"❌ 文件或路径不存在：`{file_path}`"
+        os.startfile(str(p))
+        return f"✅ 已成功为你打开：`{p.name}` 🌸"
     except Exception as e:
-        return f"打开失败：{e}"
-
-
-@register_tool(description="用鼠标点击屏幕指定坐标位置，参数为 x 和 y 坐标")
-def click_position(x: int, y: int) -> str:
-    try:
-        import pyautogui
-        pyautogui.click(x, y)
-        return f"✅ 已点击坐标 ({x}, {y})"
-    except Exception as e:
-        return f"点击失败：{e}"
-
-
-@register_tool(description="在当前焦点位置输入文字，参数为要输入的文字内容")
-def type_text(text: str) -> str:
-    try:
-        import pyautogui
-        import time
-        time.sleep(0.3)
-        pyautogui.write(text, interval=0.05)
-        return f"✅ 已输入文字：{text[:30]}..."
-    except Exception as e:
-        return f"输入失败：{e}"
-
-
-@register_tool(description="获取当前屏幕分辨率")
-def get_screen_size() -> str:
-    try:
-        import pyautogui
-        w, h = pyautogui.size()
-        return f"当前屏幕分辨率：{w} x {h}"
-    except Exception as e:
-        return f"获取失败：{e}"
-
-
-@register_tool(description="列出桌面上的所有文件和文件夹")
-def list_desktop() -> str:
-    try:
-        desktop = Path.home() / "Desktop"
-        items = list(desktop.iterdir())
-        files = [f.name for f in items if f.is_file()]
-        folders = [f.name for f in items if f.is_dir()]
-        result = f"桌面上共有 {len(items)} 个项目：\n"
-        if folders:
-            result += f"\n📁 文件夹（{len(folders)}个）：\n" + "\n".join(f"  {f}" for f in folders[:10])
-        if files:
-            result += f"\n📄 文件（{len(files)}个）：\n" + "\n".join(f"  {f}" for f in files[:10])
-        return result
-    except Exception as e:
-        return f"获取失败：{e}"
+        return f"❌ 打开失败：{e}"

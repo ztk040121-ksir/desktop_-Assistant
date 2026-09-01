@@ -15,3 +15,5 @@ test_screenshots/
 *.zip
 *.cmo3
 *.can3
+.workbuddy/
+hiyori_zh-Hans_extracted/

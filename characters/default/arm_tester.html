@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Hiyori Pro Arm & Hand Pose Tester</title>
+<!-- Live2D Cubism Core -->
+<script src="libs/live2dcubismcore.min.js"></script>
+<!-- PixiJS v6 -->
+<script src="libs/pixi.min.js"></script>
+<!-- Pixi-Live2D-Display Cubism4 -->
+<script src="libs/cubism4.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+body { background: #181528; color: #eee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; height: 100vh; overflow: hidden; }
+#canvas-wrap { flex: 1; height: 100vh; position: relative; background: radial-gradient(circle at center, #2e264f 0%, #151224 100%); display: flex; align-items: center; justify-content: center; }
+#panel { width: 380px; height: 100vh; background: #1f1b33; border-left: 1px solid #3d3460; padding: 18px; overflow-y: auto; font-size: 13px; }
+h2 { font-size: 16px; color: #a78bfa; margin-bottom: 12px; }
+.section { background: #282244; border-radius: 8px; padding: 12px; margin-bottom: 14px; border: 1px solid #3f3669; }
+.section h3 { font-size: 13px; color: #c4b5fd; margin-bottom: 8px; }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+button { background: #4c3b7a; color: #fff; border: 1px solid #6d54af; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.15s; }
+button:hover { background: #634ba1; border-color: #8b6fd6; }
+button.active { background: #8b5cf6; border-color: #a78bfa; font-weight: bold; }
+.row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.row label { color: #cbd5e1; font-size: 12px; flex: 1; }
+.row input[type=range] { flex: 1.5; margin: 0 8px; }
+.row span { color: #f472b6; width: 40px; text-align: right; font-family: monospace; font-size: 12px; }
+#status { color: #34d399; font-weight: bold; margin-bottom: 8px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap">
+  <div id="canvas-container" style="width: 380px; height: 470px; border: 1px dashed rgba(167, 139, 250, 0.4); border-radius: 12px; position: relative;">
+  </div>
+</div>
+
+<div id="panel">
+  <h2>🎮 Hiyori Pro 姿势与手臂控制</h2>
+  <div id="status">正在加载 HiyoriPro 模型...</div>
+
+  <div class="section">
+    <h3>手臂层切换 (PartArm)</h3>
+    <div class="btn-group">
+      <button id="btnArmA" class="active" onclick="switchArm('A')">手臂 A (直垂自然手)</button>
+      <button id="btnArmB" onclick="switchArm('B')">手臂 B (弯曲/胸前/打字姿势!)</button>
+    </div>
+    <div style="font-size: 11px; color: #94a3b8;">
+      说明: 手臂B是弯曲姿势，能把手放在前方桌面上！
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>手臂 B 详细参数 (弯曲姿态)</h3>
+    <div class="row">
+      <label>ParamArmLB (左臂B):</label>
+      <input type="range" id="ParamArmLB" min="-10" max="10" step="0.1" value="0" oninput="onParamChange('ParamArmLB', this.value)">
+      <span id="v_ParamArmLB">0</span>
+    </div>
+    <div class="row">
+      <label>ParamArmRB (右臂B):</label>
+      <input type="range" id="ParamArmRB" min="-10" max="10" step="0.1" value="0" oninput="onParamChange('ParamArmRB', this.value)">
+      <span id="v_ParamArmRB">0</span>
+    </div>
+    <div class="row">
+      <label>ParamHandLB (左手B旋转):</label>
+      <input type="range" id="ParamHandLB" min="-10" max="10" step="0.1" value="0" oninput="onParamChange('ParamHandLB', this.value)">
+      <span id="v_ParamHandLB">0</span>
+    </div>
+    <div class="row">
+      <label>ParamHandRB (右手B旋转):</label>
+      <input type="range" id="ParamHandRB" min="-10" max="10" step="0.1" value="0" oninput="onParamChange('ParamHandRB', this.value)">
+      <span id="v_ParamHandRB">0</span>
+    </div>
+    <div class="row">
+      <label>ParamHandL (左手形态):</label>
+      <input type="range" id="ParamHandL" min="-1" max="1" step="0.1" value="0" oninput="onParamChange('ParamHandL', this.value)">
+      <span id="v_ParamHandL">0</span>
+    </div>
+    <div class="row">
+      <label>ParamHandR (右手形态):</label>
+      <input type="range" id="ParamHandR" min="-1" max="1" step="0.1" value="0" oninput="onParamChange('ParamHandR', this.value)">
+      <span id="v_ParamHandR">0</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>手臂 A 参数 (直臂姿态)</h3>
+    <div class="row">
+      <label>ParamArmLA (左臂A摆动):</label>
+      <input type="range" id="ParamArmLA" min="-1" max="1" step="0.05" value="0" oninput="onParamChange('ParamArmLA', this.value)">
+      <span id="v_ParamArmLA">0</span>
+    </div>
+    <div class="row">
+      <label>ParamArmRA (右臂A摆动):</label>
+      <input type="range" id="ParamArmRA" min="-1" max="1" step="0.05" value="0" oninput="onParamChange('ParamArmRA', this.value)">
+      <span id="v_ParamArmRA">0</span>
+    </div>
+    <div class="row">
+      <label>ParamShoulder (肩膀高度):</label>
+      <input type="range" id="ParamShoulder" min="-1" max="1" step="0.05" value="0" oninput="onParamChange('ParamShoulder', this.value)">
+      <span id="v_ParamShoulder">0</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>身体与头部</h3>
+    <div class="row">
+      <label>ParamBodyAngleX (身体X):</label>
+      <input type="range" id="ParamBodyAngleX" min="-10" max="10" step="0.5" value="0" oninput="onParamChange('ParamBodyAngleX', this.value)">
+      <span id="v_ParamBodyAngleX">0</span>
+    </div>
+    <div class="row">
+      <label>ParamBodyAngleY (身体俯仰/前倾):</label>
+      <input type="range" id="ParamBodyAngleY" min="-10" max="10" step="0.5" value="0" oninput="onParamChange('ParamBodyAngleY', this.value)">
+      <span id="v_ParamBodyAngleY">0</span>
+    </div>
+    <div class="row">
+      <label>ParamAngleY (头部俯仰):</label>
+      <input type="range" id="ParamAngleY" min="-30" max="30" step="1" value="0" oninput="onParamChange('ParamAngleY', this.value)">
+      <span id="v_ParamAngleY">0</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>播放官方动作</h3>
+    <div class="btn-group">
+      <button onclick="playMotion('hiyori_m01')">动作 01 (Idle)</button>
+      <button onclick="playMotion('hiyori_m02')">动作 02 (害羞)</button>
+      <button onclick="playMotion('hiyori_m03')">动作 03 (打招呼)</button>
+      <button onclick="playMotion('hiyori_m04')">动作 04 (低头)</button>
+      <button onclick="playMotion('hiyori_m05')">动作 05 (歪头)</button>
+      <button onclick="playMotion('hiyori_m06')">动作 06 (手臂B动作!)</button>
+      <button onclick="playMotion('hiyori_m07')">动作 07 (Tap)</button>
+      <button onclick="playMotion('hiyori_m08')">动作 08 (手臂B双手!)</button>
+      <button onclick="playMotion('hiyori_m09')">动作 09 (TapBody)</button>
+      <button onclick="playMotion('hiyori_m10')">动作 10 (FlickBody)</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let app, model, currentArm = 'A';
+const paramOverrides = {};
+
+const container = document.getElementById('canvas-container');
+app = new PIXI.Application({
+  view: document.createElement('canvas'),
+  autoStart: true,
+  backgroundAlpha: 0,
+  antialias: true,
+  width: 380,
+  height: 470,
+  resolution: window.devicePixelRatio || 1,
+  autoDensity: true
+});
+container.appendChild(app.view);
+
+const MODEL_PATH = 'live2d_model/HiyoriPro/hiyori_pro_t11.model3.json';
+
+PIXI.live2d.Live2DModel.from(MODEL_PATH).then(loadedModel => {
+  model = loadedModel;
+  app.stage.addChild(model);
+  
+  model.scale.set(0.24, 0.24);
+  model.anchor.set(0.5, 0.0);
+  model.position.set(190, 10);
+  
+  document.getElementById('status').textContent = '✅ HiyoriPro 模型加载成功！';
+  console.log('[Tester] Loaded HiyoriPro successfully');
+  
+  app.ticker.add(updateLoop);
+}).catch(err => {
+  document.getElementById('status').textContent = '❌ 加载失败: ' + err.message;
+  console.error(err);
+});
+
+function switchArm(arm) {
+  currentArm = arm;
+  document.getElementById('btnArmA').classList.toggle('active', arm === 'A');
+  document.getElementById('btnArmB').classList.toggle('active', arm === 'B');
+}
+
+function onParamChange(id, val) {
+  paramOverrides[id] = parseFloat(val);
+  const span = document.getElementById('v_' + id);
+  if (span) span.textContent = val;
+}
+
+function updateLoop() {
+  if (!model || !model.internalModel || !model.internalModel.coreModel) return;
+  const core = model.internalModel.coreModel;
+  
+  // Set arm layer opacity
+  if (currentArm === 'A') {
+    setCorePartOpacity(core, 'PartArmA', 1.0);
+    setCorePartOpacity(core, 'PartArmB', 0.0);
+  } else {
+    setCorePartOpacity(core, 'PartArmA', 0.0);
+    setCorePartOpacity(core, 'PartArmB', 1.0);
+  }
+  
+  // Apply manual parameter overrides
+  for (const [id, val] of Object.entries(paramOverrides)) {
+    setCoreParam(core, id, val);
+  }
+}
+
+function setCoreParam(core, id, value) {
+  try {
+    if (core.setParameterValueById) core.setParameterValueById(id, value);
+    else if (core.setParamFloat) core.setParamFloat(id, value);
+  } catch(e) {}
+}
+
+function setCorePartOpacity(core, id, value) {
+  try {
+    if (core.setPartOpacityById) core.setPartOpacityById(id, value);
+    else if (core.setPartOpacity) core.setPartOpacity(id, value);
+  } catch(e) {}
+}
+
+function playMotion(motionName) {
+  if (!model) return;
+  const motionFile = `motion/${motionName}.motion3.json`;
+  model.motion(motionFile);
+}
+</script>
+</body>
+</html>

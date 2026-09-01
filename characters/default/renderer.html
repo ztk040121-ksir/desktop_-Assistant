@@ -3,273 +3,985 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Live2D Desktop Pet - Hiyori (Compact Mini)</title>
+<title>Live2D Desktop Pet - Hiyori</title>
 <style>
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
   user-select: none;
-  -webkit-user-select: none;
 }
 html, body {
-  width: 100vw;
-  height: 100vh;
-  background: transparent !important;
-  overflow: hidden;
-  cursor: default;
-}
-#canvas-container {
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+#canvas-container {
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 1;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
 }
 canvas {
   width: 100% !important;
   height: 100% !important;
   display: block;
-  background: transparent !important;
 }
 
-/* Compact Mini Desk at Bottom */
+/* Dynamic Active Status Pill (Fades in ONLY during active gazing or typing) */
+#status-badge {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.9);
+  background: rgba(30, 18, 38, 0.94);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 140, 180, 0.55);
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #ff94b8;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 3px 12px rgba(255, 105, 180, 0.35);
+  z-index: 85;
+  pointer-events: none;
+  opacity: 0;
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+#status-badge.badge-visible {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* Floating Sakura Care Speech Bubble (Comfortably above head, auto-fitting, 0 clipping) */
+#care-bubble {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  min-height: 40px;
+  max-height: 82px;
+  background: rgba(34, 22, 42, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1.5px solid rgba(255, 140, 180, 0.65);
+  border-radius: 12px;
+  padding: 5px 8px;
+  box-shadow: 0 4px 16px rgba(255, 105, 180, 0.3), 0 2px 6px rgba(0,0,0,0.35);
+  z-index: 92;
+  pointer-events: auto;
+  cursor: pointer;
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+#care-bubble.care-bubble-hidden {
+  opacity: 0;
+  transform: translateY(-12px) scale(0.88);
+  pointer-events: none;
+}
+#care-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 28px;
+  width: 9px;
+  height: 9px;
+  background: rgba(34, 22, 42, 0.96);
+  border-right: 1.5px solid rgba(255, 140, 180, 0.65);
+  border-bottom: 1.5px solid rgba(255, 140, 180, 0.65);
+  transform: rotate(45deg);
+}
+.care-bubble-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+.care-avatar {
+  font-size: 11px;
+}
+.care-author {
+  font-size: 10.5px;
+  font-weight: bold;
+  color: #ff94b8;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+}
+.care-time-tag {
+  margin-left: auto;
+  font-size: 8.5px;
+  background: rgba(255, 105, 180, 0.22);
+  color: #ffb3cc;
+  padding: 1px 5px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 140, 180, 0.35);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+#care-bubble-text {
+  font-size: 9.5px;
+  line-height: 1.35;
+  color: #fff2f6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  word-break: break-word;
+}
+
+/* Sleep FX */
+#sleep-fx {
+  position: fixed;
+  top: 76px;
+  right: 18px;
+  font-size: 20px;
+  color: #a8d5ff;
+  font-weight: bold;
+  text-shadow: 0 0 8px rgba(168, 213, 255, 0.8);
+  display: none;
+  z-index: 70;
+  animation: sleepFloat 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes sleepFloat {
+  0% { transform: translateY(0) scale(0.7); opacity: 0.2; }
+  50% { transform: translateY(-10px) scale(1.1); opacity: 0.9; }
+  100% { transform: translateY(-20px) scale(1.3); opacity: 0; }
+}
+
+/* Headpat Interactive Hitbox */
+#headpat-zone {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90px;
+  height: 55px;
+  z-index: 75;
+  cursor: pointer;
+}
+
+/* Floating Heart Effect on Headpat */
+.heart-fx {
+  position: fixed;
+  pointer-events: none;
+  font-size: 16px;
+  z-index: 120;
+  animation: floatHeart 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+@keyframes floatHeart {
+  0% { opacity: 1; transform: translate(0, 0) scale(0.6); }
+  100% { opacity: 0; transform: translate(var(--dx, 0px), -45px) scale(1.3); }
+}
+
+/* Custom Timer Modal */
+#timer-modal {
+  position: fixed;
+  bottom: 46px;
+  left: 10px;
+  right: 10px;
+  background: rgba(34, 22, 42, 0.97);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid rgba(255, 140, 180, 0.65);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 4px 18px rgba(255, 105, 180, 0.35);
+  z-index: 96;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+#timer-modal.modal-hidden {
+  opacity: 0;
+  transform: translateY(15px) scale(0.85);
+  pointer-events: none;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-title {
+  font-size: 11px;
+  font-weight: bold;
+  color: #ff94b8;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.modal-close {
+  color: #ffb3cc;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.preset-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.time-chip {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 140, 180, 0.35);
+  border-radius: 6px;
+  color: #fff4f8;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 4px 0;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.time-chip:hover {
+  background: rgba(255, 105, 180, 0.35);
+  border-color: #ff6599;
+}
+.custom-timer-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.custom-timer-input {
+  flex: 1;
+  background: rgba(20, 14, 26, 0.8);
+  border: 1px solid rgba(255, 140, 180, 0.4);
+  border-radius: 6px;
+  color: #ffffff;
+  padding: 3px 6px;
+  font-size: 11px;
+  text-align: center;
+  font-weight: bold;
+  outline: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.custom-timer-input:focus {
+  border-color: #ff6599;
+  box-shadow: 0 0 6px rgba(255, 105, 180, 0.4);
+}
+.start-timer-btn {
+  background: linear-gradient(135deg, #ff6599, #ff8da1);
+  border: none;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: bold;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.start-timer-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(255, 105, 180, 0.5);
+}
+
+/* Compact 3x2 Snack Tray (0 Overflow) */
+#snack-tray {
+  position: fixed;
+  bottom: 46px;
+  left: 10px;
+  right: 10px;
+  background: rgba(34, 22, 42, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid rgba(255, 140, 180, 0.65);
+  border-radius: 12px;
+  padding: 6px 6px;
+  box-shadow: 0 4px 18px rgba(255, 105, 180, 0.35);
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+#snack-tray.tray-hidden {
+  opacity: 0;
+  transform: translateY(15px) scale(0.85);
+  pointer-events: none;
+}
+.tray-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2px;
+}
+.tray-title {
+  font-size: 10px;
+  font-weight: bold;
+  color: #ff94b8;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.tray-close {
+  color: #ffb3cc;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.tray-items {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.snack-btn {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 140, 180, 0.3);
+  border-radius: 6px;
+  padding: 4px 0;
+  font-size: 15px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.snack-btn:hover {
+  background: rgba(255, 105, 180, 0.35);
+  transform: scale(1.12);
+  border-color: #ff6b9d;
+}
+
+
+/* ============================================================ */
+/* 🌸 春日和专属 动漫高精双手扒边探头挂件 (Anime Peeker Avatar)   */
+/* ============================================================ */
+.peeker-avatar {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: auto;
+  z-index: 99;
+  display: none;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+  animation: peekerBreathe 2.6s ease-in-out infinite alternate;
+  transition: filter 0.2s ease;
+}
+@keyframes peekerBreathe {
+  0% { transform: translateY(-50%) scale(1); }
+  100% { transform: translateY(-53%) scale(1.04); }
+}
+.peeker-avatar:hover {
+  filter: drop-shadow(0 6px 18px rgba(255, 105, 180, 0.75)) brightness(1.06);
+}
+
+#peeker-img-right {
+  left: 0;
+}
+#peeker-img-left {
+  right: 0;
+}
+
+#desk-stage {
+  transition: opacity 0.25s ease;
+}
+.desk-hidden {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Compact Desk Stage */
 #desk-stage {
   position: fixed;
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 42px;
-  background: linear-gradient(180deg, #f7d8b5 0%, #e2b382 35%, #be8b56 100%);
-  border-top: 3px solid #fff2e0;
-  border-radius: 8px 8px 0 0;
-  box-shadow: 0 -3px 10px rgba(90, 50, 15, 0.28);
+  height: 48px;
+  z-index: 50;
   pointer-events: none;
-  z-index: 20;
+  background: linear-gradient(180deg, #dfab7b 0%, #ba8252 50%, #9c683b 100%);
+  border-top: 3px solid #ffcc99;
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -3px 12px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.4);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 2px 12px 2px 12px;
+  padding: 4px 8px 2px 8px;
 }
-
-/* Mini Keyboard */
 #mini-keyboard {
-  width: 95px;
-  height: 30px;
-  background: #2b2d42;
-  border-radius: 4px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  width: 108px;
+  height: 38px;
+  background: #252d3d;
+  border: 2px solid #3c4961;
+  border-radius: 6px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.15);
   display: flex;
   flex-direction: column;
-  justify-content: space-evenly;
-  padding: 2px;
-  border: 1px solid #4a4e69;
+  justify-content: space-around;
+  padding: 2px 3px;
 }
 .kb-row {
   display: flex;
+  justify-content: space-between;
   gap: 2px;
-  height: 6px;
 }
 .kb-key {
   flex: 1;
-  background: #edf2f4;
-  border-radius: 1px;
+  height: 8px;
+  background: #e6ebf5;
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
   transition: all 0.08s ease;
 }
 .kb-key.active {
-  background: #ff75a0 !important;
+  background: #ff548d !important;
+  box-shadow: 0 0 8px #ff548d, 0 1px 1px rgba(0,0,0,0.2) !important;
   transform: translateY(1px) scale(0.95);
-  box-shadow: 0 0 5px #ff75a0;
 }
-
-/* Mini Mousepad & Mouse */
-#mini-mousepad {
-  width: 42px;
-  height: 30px;
-  background: #1d3557;
-  border-radius: 4px;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
+#mouse-pad {
+  width: 52px;
+  height: 38px;
+  background: #1c2738;
+  border: 1.5px solid #2f3e58;
+  border-radius: 6px;
   position: relative;
-  border: 1px solid #457b9d;
   overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 #mini-mouse {
-  width: 12px;
-  height: 18px;
-  background: #f1faee;
-  border-radius: 6px 6px 4px 4px;
-  position: absolute;
-  top: 6px;
-  left: 15px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-  transition: transform 0.08s cubic-bezier(0.2, 0.8, 0.3, 1), background-color 0.1s;
-  border: 1px solid #a8dadc;
+  width: 14px;
+  height: 22px;
+  background: #f0f7ff;
+  border: 1.5px solid #00d2ff;
+  border-radius: 7px 7px 5px 5px;
+  box-shadow: 0 0 6px rgba(0, 210, 255, 0.6), 0 2px 4px rgba(0,0,0,0.3);
+  position: relative;
+  transition: transform 0.06s linear;
 }
-#mini-mouse.clicking {
-  background: #ff75a0;
-  box-shadow: 0 0 6px #ff75a0;
-}
-#mini-mouse::after {
+#mini-mouse::before {
   content: '';
   position: absolute;
-  top: 2px;
+  top: 3px;
   left: 5px;
   width: 2px;
-  height: 3.5px;
-  background: #457b9d;
+  height: 5px;
+  background: #00d2ff;
   border-radius: 1px;
-}
-
-/* Compact Status Badge */
-#emotion-badge {
-  position: fixed;
-  top: 6px;
-  left: 8px;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(8px);
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
-  font-size: 9px;
-  font-weight: bold;
-  color: #ff5e92;
-  box-shadow: 0 2px 6px rgba(255, 130, 170, 0.25);
-  pointer-events: none;
-  opacity: 1;
-  transform: translateY(0);
-  transition: all 0.3s ease;
-  z-index: 50;
-}
-#emotion-badge.hide {
-  opacity: 0;
-  transform: translateY(-5px);
-}
-
-/* Sleep Floating ZzZ */
-#sleep-fx {
-  position: fixed;
-  top: 14px;
-  right: 15px;
-  font-size: 18px;
-  pointer-events: none;
-  display: none;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
-  animation: floatZ 2.5s infinite ease-in-out;
-  z-index: 50;
-}
-@keyframes floatZ {
-  0% { opacity: 0; transform: translate(0, 5px) scale(0.7); }
-  50% { opacity: 1; transform: translate(6px, -10px) scale(1.15); }
-  100% { opacity: 0; transform: translate(12px, -22px) scale(1.35); }
-}
-
-.tap-particle {
-  position: fixed;
-  pointer-events: none;
-  font-size: 11px;
-  font-weight: bold;
-  color: #ff4081;
-  z-index: 60;
-  animation: floatTap 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
-}
-@keyframes floatTap {
-  0% { opacity: 1; transform: translate(0, 0) scale(0.7); }
-  100% { opacity: 0; transform: translate(var(--dx, 0px), -20px) scale(1.1); }
 }
 
 /* Loading */
 #loader-ui {
   position: fixed;
-  inset: 0;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
-  transition: opacity 0.4s ease;
   z-index: 100;
+  transition: opacity 0.5s ease;
 }
 .spinner {
-  width: 22px;
-  height: 22px;
-  border: 2.5px solid rgba(255, 160, 200, 0.25);
-  border-top: 2.5px solid rgba(255, 105, 180, 0.95);
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(255, 105, 180, 0.2);
+  border-top-color: #ff6599;
   border-radius: 50%;
-  animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  margin-bottom: 4px;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 #loader-text {
-  color: #ff75a0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+  margin-top: 8px;
   font-size: 10px;
-  font-weight: 600;
+  color: #ff6599;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 
+<!-- Fallback function stubs in head -->
 <script>
-window.onGlobalMouseMove = function(x, y) {};
+window.onGlobalMouseMove = function(x, y, d) {};
 window.onGlobalKeyPress = function(k) {};
 window.onGlobalMouseClick = function(b) {};
 window.triggerAction = function(a, d) {};
 window.triggerEmotion = function(e) {};
-window.onerror = function(msg, url, line, col, error) {
-  console.error('[Live2D Error] ' + msg + ' (' + line + ':' + col + ')');
-};
-window.onunhandledrejection = function(e) {
-  console.error('[Live2D Rejection] ' + (e.reason ? (e.reason.stack || e.reason) : e));
-};
 </script>
 
-<!-- Live2D Cubism Core -->
-<script src="libs/live2dcubismcore.min.js"></script>
-<!-- PixiJS v6 -->
+<!-- External Dependencies -->
 <script src="libs/pixi.min.js"></script>
-<!-- Pixi-Live2D-Display Cubism4 -->
+<script src="libs/live2dcubismcore.min.js"></script>
 <script src="libs/cubism4.min.js"></script>
-<!-- QWebChannel for Python Qt integration -->
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 </head>
 <body>
 
 <div id="loader-ui">
   <div class="spinner"></div>
-  <div id="loader-text">✨ 桃濑日和 准备中...</div>
+  <div id="loader-text">🌸 春日和加载中...</div>
 </div>
 
-<div id="sleep-fx">💤 z Z z</div>
-<div id="emotion-badge">💖 桃濑日和就绪</div>
+<!-- Dynamic Active Status Pill -->
+<div id="status-badge">👀 正在看着主人</div>
+
+<!-- Floating Care Speech Bubble -->
+<div id="care-bubble" class="care-bubble-hidden" onclick="dismissCareBubble()">
+  <div class="care-bubble-header">
+    <span class="care-avatar">🌸</span>
+    <span class="care-author">春日和</span>
+    <span class="care-time-tag" id="care-time-tag">🌙 深夜关怀</span>
+  </div>
+  <div id="care-bubble-text">夜已经很深了呢… 主人要早点休息，明天才会元气满满哦~ 🌙</div>
+</div>
+
+<div id="sleep-fx">💤</div>
+
+<!-- Headpat Hitbox -->
+<div id="headpat-zone" title="摸摸日和的头~" onclick="triggerHeadpat()"></div>
+
+<!-- Custom Timer Modal -->
+<div id="timer-modal" class="modal-hidden">
+  <div class="modal-header">
+    <span class="modal-title">⏱️ 设定专注时长</span>
+    <span class="modal-close" onclick="dismissTimerModal()">✕</span>
+  </div>
+  <div class="preset-row">
+    <button class="time-chip" onclick="startFocusTimer(10)">10分</button>
+    <button class="time-chip" onclick="startFocusTimer(25)">25分</button>
+    <button class="time-chip" onclick="startFocusTimer(45)">45分</button>
+    <button class="time-chip" onclick="startFocusTimer(60)">60分</button>
+  </div>
+  <div class="custom-timer-row">
+    <input type="number" id="custom-minutes-input" min="1" max="180" value="30" placeholder="分钟" class="custom-timer-input">
+    <button class="start-timer-btn" onclick="startCustomTimer()">开启 🍅</button>
+  </div>
+</div>
+
+<!-- Compact 3x2 Snack Tray (0 Overflow) -->
+<div id="snack-tray" class="tray-hidden">
+  <div class="tray-header">
+    <span class="tray-title">🍰 投喂小点心</span>
+    <span class="tray-close" onclick="dismissSnackTray()">✕</span>
+  </div>
+  <div class="tray-items">
+    <div class="snack-btn" title="草莓蛋糕" onclick="feedSnack('cake', '🍰 草莓蛋糕')">🍰</div>
+    <div class="snack-btn" title="三色团子" onclick="feedSnack('dango', '🍡 三色团子')">🍡</div>
+    <div class="snack-btn" title="珍珠奶茶" onclick="feedSnack('boba', '🧋 珍珠奶茶')">🧋</div>
+    <div class="snack-btn" title="巧克力曲奇" onclick="feedSnack('cookie', '🍪 巧克力曲奇')">🍪</div>
+    <div class="snack-btn" title="热腾拉面" onclick="feedSnack('ramen', '🍜 热腾拉面')">🍜</div>
+    <div class="snack-btn" title="香草甜筒" onclick="feedSnack('icecream', '🍦 香草甜筒')">🍦</div>
+  </div>
+</div>
+
+<!-- 春日和高精动漫双手扒边挂件 -->
+<img id="peeker-img-right" class="peeker-avatar" src="assets/peeker_right.png" alt="春日和探头" title="点击或移动鼠标唤醒春日和~" onclick="if (window._pb && window._pb.onUserDoubleClick) window._pb.onUserDoubleClick();" />
+<img id="peeker-img-left" class="peeker-avatar" src="assets/peeker_left.png" alt="春日和探头" title="点击或移动鼠标唤醒春日和~" onclick="if (window._pb && window._pb.onUserDoubleClick) window._pb.onUserDoubleClick();" />
 <div id="canvas-container"></div>
 
-<!-- Desk Setup Cleanly At Bottom -->
+<!-- Compact Desk Stage -->
 <div id="desk-stage">
   <div id="mini-keyboard">
-    <div class="kb-row">
-      <div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div>
-    </div>
-    <div class="kb-row">
-      <div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div>
-    </div>
-    <div class="kb-row">
-      <div class="kb-key" style="flex:2"></div><div class="kb-key" style="flex:4"></div><div class="kb-key" style="flex:2"></div>
-    </div>
+    <div class="kb-row"><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div></div>
+    <div class="kb-row"><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div></div>
+    <div class="kb-row"><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div><div class="kb-key"></div></div>
   </div>
-
-  <div id="mini-mousepad">
+  <div id="mouse-pad">
     <div id="mini-mouse"></div>
   </div>
 </div>
 
 <script>
-'use strict';
-
 console.log('[Live2D] Initializing Mini Compact Hiyori Pet...');
 
-if (window.PIXI && PIXI.live2d && PIXI.live2d.Live2DModel) {
-  PIXI.live2d.Live2DModel.registerTicker(PIXI.Ticker);
-}
+// ============================================================
+// 1. ALL CONSTANTS & DATABASES (TOP DECLARED - ZERO TDZ)
+// ============================================================
+const ALL_MOTIONS = [
+  { name: 'm01', file: 'motion/hiyori_m01.motion3.json', desc: '自然呼吸' },
+  { name: 'm02', file: 'motion/hiyori_m02.motion3.json', desc: '好奇歪头' },
+  { name: 'm03', file: 'motion/hiyori_m03.motion3.json', desc: '欢快点头' },
+  { name: 'm04', file: 'motion/hiyori_m04.motion3.json', desc: '温婉侧身' },
+  { name: 'm05', file: 'motion/hiyori_m05.motion3.json', desc: '困倦伸展' },
+  { name: 'm06', file: 'motion/hiyori_m06.motion3.json', desc: '元气挥手' },
+  { name: 'm07', file: 'motion/hiyori_m07.motion3.json', desc: '害羞微笑' },
+  { name: 'm08', file: 'motion/hiyori_m08.motion3.json', desc: '开朗晃脑' },
+  { name: 'm09', file: 'motion/hiyori_m09.motion3.json', desc: '惊喜轻跳' },
+  { name: 'm10', file: 'motion/hiyori_m10.motion3.json', desc: '加油打气' }
+];
 
+const PROCEDURAL_ACTIONS = [
+  {
+    name: 'depressed_sad',
+    duration: 5500,
+    animate: (p, core) => {
+      const s = Math.sin(p * Math.PI);
+      setCoreParam(core, 'ParamAngleY', -24 * s - 3);
+      setCoreParam(core, 'ParamBrowLY', -0.6 * s);
+      setCoreParam(core, 'ParamBrowRY', -0.6 * s);
+      setCoreParam(core, 'ParamBrowLAngle', -0.4 * s);
+      setCoreParam(core, 'ParamBrowRAngle', 0.4 * s);
+      setCoreParam(core, 'ParamEyeLOpen', Math.max(0.35, 1 - s * 0.6));
+      setCoreParam(core, 'ParamEyeROpen', Math.max(0.35, 1 - s * 0.6));
+      setCoreParam(core, 'ParamMouthForm', -0.7 * s);
+      setCoreParam(core, 'ParamMouthOpenY', s * 0.08);
+      setCoreParam(core, 'ParamShoulder', -0.4 * s);
+      setCoreParam(core, 'ParamHairAhoge', -8 * s);
+    }
+  },
+  {
+    name: 'hungry_craving',
+    duration: 5000,
+    animate: (p, core) => {
+      const s = Math.sin(p * Math.PI);
+      const gulp = Math.sin(p * Math.PI * 4);
+      setCoreParam(core, 'ParamAngleY', 8 * s - 3);
+      setCoreParam(core, 'ParamEyeBallY', -0.6 * s);
+      setCoreParam(core, 'ParamBrowLY', 0.25 * s);
+      setCoreParam(core, 'ParamBrowRY', 0.25 * s);
+      setCoreParam(core, 'ParamMouthOpenY', Math.abs(gulp) * 0.18);
+      setCoreParam(core, 'ParamMouthForm', 0.3);
+      setCoreParam(core, 'ParamCheek', 0.3 * s);
+      setCoreParam(core, 'ParamHairAhoge', s * 6 + gulp * 3);
+    }
+  },
+  {
+    name: 'chewing_munch',
+    duration: 4800,
+    animate: (p, core) => {
+      const chew = Math.sin(p * Math.PI * 8);
+      const headSway = Math.sin(p * Math.PI * 2);
+      setCoreParam(core, 'ParamAngleZ', headSway * 8);
+      setCoreParam(core, 'ParamAngleY', Math.abs(chew) * 6 - 2);
+      setCoreParam(core, 'ParamMouthOpenY', Math.abs(chew) * 0.25);
+      setCoreParam(core, 'ParamMouthForm', 0.8);
+      setCoreParam(core, 'ParamCheek', 0.85);
+      setCoreParam(core, 'ParamEyeLSmile', 0.95);
+      setCoreParam(core, 'ParamEyeRSmile', 0.95);
+      setCoreParam(core, 'ParamEyeLOpen', 0.2);
+      setCoreParam(core, 'ParamEyeROpen', 0.2);
+      setCoreParam(core, 'ParamSideupRibbon', headSway * 10);
+    }
+  },
+  {
+    name: 'comforted_happy',
+    duration: 4000,
+    animate: (p, core) => {
+      const s = Math.sin(p * Math.PI);
+      setCoreParam(core, 'ParamAngleY', s * 12 - 3);
+      setCoreParam(core, 'ParamAngleZ', s * 8);
+      setCoreParam(core, 'ParamCheek', 0.8);
+      setCoreParam(core, 'ParamEyeLSmile', 1.0);
+      setCoreParam(core, 'ParamEyeRSmile', 1.0);
+      setCoreParam(core, 'ParamEyeLOpen', 0.15);
+      setCoreParam(core, 'ParamEyeROpen', 0.15);
+      setCoreParam(core, 'ParamMouthOpenY', s * 0.2);
+      setCoreParam(core, 'ParamMouthForm', 0.9);
+      setCoreParam(core, 'ParamHairAhoge', s * 10);
+    }
+  },
+  {
+    name: 'tsundere_pout',
+    duration: 4200,
+    animate: (p, core) => {
+      const s = Math.sin(p * Math.PI);
+      setCoreParam(core, 'ParamAngleX', s * 24);
+      setCoreParam(core, 'ParamAngleZ', s * 8);
+      setCoreParam(core, 'ParamEyeBallX', -s * 0.85);
+      setCoreParam(core, 'ParamCheek', 0.2 + s * 0.55);
+      setCoreParam(core, 'ParamBrowLY', -s * 0.25);
+      setCoreParam(core, 'ParamBrowRY', -s * 0.25);
+      setCoreParam(core, 'ParamMouthForm', -0.4 * s);
+    }
+  },
+  {
+    name: 'stretch',
+    duration: 3600,
+    animate: (p, core) => {
+      const s = Math.sin(p * Math.PI);
+      setCoreParam(core, 'ParamShoulder', s * 0.45);
+      setCoreParam(core, 'ParamBreath', 0.5 + s * 0.45);
+      setCoreParam(core, 'ParamAngleY', s * 14 - 3);
+      setCoreParam(core, 'ParamEyeLSmile', s * 0.7);
+      setCoreParam(core, 'ParamEyeRSmile', s * 0.7);
+      setCoreParam(core, 'ParamEyeLOpen', 1 - s * 0.5);
+      setCoreParam(core, 'ParamEyeROpen', 1 - s * 0.5);
+      setCoreParam(core, 'ParamCheek', 0.2 + s * 0.25);
+    }
+  },
+  {
+    name: 'wander_look',
+    duration: 4800,
+    animate: (p, core) => {
+      const angleX = Math.sin(p * Math.PI * 2) * 24;
+      const angleY = Math.cos(p * Math.PI * 2) * 14 - 2;
+      setCoreParam(core, 'ParamAngleX', angleX);
+      setCoreParam(core, 'ParamAngleY', angleY);
+      setCoreParam(core, 'ParamAngleZ', angleX * 0.28);
+      setCoreParam(core, 'ParamEyeBallX', (angleX / 24) * 0.95);
+      setCoreParam(core, 'ParamEyeBallY', (angleY / 14) * 0.85);
+      setCoreParam(core, 'ParamBrowLY', 0.28);
+      setCoreParam(core, 'ParamBrowRY', 0.28);
+    }
+  },
+  {
+    name: 'rhythmic_bop',
+    duration: 4200,
+    animate: (p, core) => {
+      const bop = Math.sin(p * Math.PI * 6);
+      setCoreParam(core, 'ParamAngleZ', bop * 15);
+      setCoreParam(core, 'ParamAngleX', bop * 8);
+      setCoreParam(core, 'ParamMouthOpenY', Math.abs(bop) * 0.15);
+      setCoreParam(core, 'ParamEyeLSmile', 0.55);
+      setCoreParam(core, 'ParamEyeRSmile', 0.55);
+      setCoreParam(core, 'ParamCheek', 0.35);
+      setCoreParam(core, 'ParamHairAhoge', bop * 8);
+    }
+  },
+  {
+    name: 'shy_smile',
+    duration: 3800,
+    animate: (p, core) => {
+      const s = Math.sin(p * Math.PI);
+      setCoreParam(core, 'ParamAngleX', s * 12);
+      setCoreParam(core, 'ParamAngleY', -s * 9 - 2);
+      setCoreParam(core, 'ParamAngleZ', s * 9);
+      setCoreParam(core, 'ParamCheek', 0.2 + s * 0.65);
+      setCoreParam(core, 'ParamEyeLSmile', s * 0.85);
+      setCoreParam(core, 'ParamEyeRSmile', s * 0.85);
+      setCoreParam(core, 'ParamMouthOpenY', s * 0.12);
+    }
+  },
+  {
+    name: 'doze_off',
+    duration: 5000,
+    animate: (p, core) => {
+      if (p < 0.65) {
+        const t = p / 0.65;
+        setCoreParam(core, 'ParamAngleY', -3 - t * 24);
+        setCoreParam(core, 'ParamEyeLOpen', Math.max(0, 1 - t * 1.3));
+        setCoreParam(core, 'ParamEyeROpen', Math.max(0, 1 - t * 1.3));
+      } else if (p < 0.75) {
+        const t = (p - 0.65) / 0.10;
+        setCoreParam(core, 'ParamAngleY', -27 + t * 35);
+        setCoreParam(core, 'ParamEyeLOpen', 1.25);
+        setCoreParam(core, 'ParamEyeROpen', 1.25);
+        setCoreParam(core, 'ParamBrowLY', 0.4);
+        setCoreParam(core, 'ParamBrowRY', 0.4);
+      } else {
+        const t = (p - 0.75) / 0.25;
+        const s = Math.sin(t * Math.PI);
+        setCoreParam(core, 'ParamAngleY', 8 - t * 11);
+        setCoreParam(core, 'ParamCheek', 0.3 + s * 0.5);
+        setCoreParam(core, 'ParamEyeLSmile', s * 0.7);
+        setCoreParam(core, 'ParamEyeRSmile', s * 0.7);
+      }
+    }
+  },
+  {
+    name: 'wink_sparkle',
+    duration: 3200,
+    animate: (p, core) => {
+      const s = Math.sin(p * Math.PI);
+      setCoreParam(core, 'ParamAngleZ', s * 12);
+      setCoreParam(core, 'ParamAngleX', s * 6);
+      setCoreParam(core, 'ParamEyeLOpen', Math.max(0, 1 - s * 1.5));
+      setCoreParam(core, 'ParamEyeLSmile', s * 0.9);
+      setCoreParam(core, 'ParamEyeROpen', 1.0 + s * 0.15);
+      setCoreParam(core, 'ParamEyeRSmile', s * 0.4);
+      setCoreParam(core, 'ParamMouthOpenY', s * 0.22);
+      setCoreParam(core, 'ParamCheek', 0.2 + s * 0.45);
+    }
+  },
+  {
+    name: 'tea_sip',
+    duration: 4200,
+    animate: (p, core) => {
+      const s = Math.sin(p * Math.PI);
+      setCoreParam(core, 'ParamAngleY', s * 10 - 3);
+      setCoreParam(core, 'ParamEyeLOpen', Math.max(0.1, 1 - s * 0.8));
+      setCoreParam(core, 'ParamEyeROpen', Math.max(0.1, 1 - s * 0.8));
+      setCoreParam(core, 'ParamEyeLSmile', s * 0.85);
+      setCoreParam(core, 'ParamEyeRSmile', s * 0.85);
+      setCoreParam(core, 'ParamBreath', 0.5 + s * 0.4);
+      setCoreParam(core, 'ParamCheek', 0.25 + s * 0.3);
+    }
+  },
+  {
+    name: 'ribbon_dance',
+    duration: 3800,
+    animate: (p, core) => {
+      const wave = Math.sin(p * Math.PI * 8);
+      setCoreParam(core, 'ParamAngleZ', wave * 16);
+      setCoreParam(core, 'ParamSideupRibbon', wave * 12);
+      setCoreParam(core, 'ParamHairFront', wave * 8);
+      setCoreParam(core, 'ParamHairBack', -wave * 6);
+      setCoreParam(core, 'ParamEyeLSmile', 0.6);
+      setCoreParam(core, 'ParamEyeRSmile', 0.6);
+      setCoreParam(core, 'ParamCheek', 0.3);
+    }
+  },
+  {
+    name: 'idea_sparkle',
+    duration: 3400,
+    animate: (p, core) => {
+      const s = Math.sin(p * Math.PI);
+      setCoreParam(core, 'ParamAngleY', s * 16 - 2);
+      setCoreParam(core, 'ParamEyeLOpen', 1.0 + s * 0.25);
+      setCoreParam(core, 'ParamEyeROpen', 1.0 + s * 0.25);
+      setCoreParam(core, 'ParamBrowLY', 0.45);
+      setCoreParam(core, 'ParamBrowRY', 0.45);
+      setCoreParam(core, 'ParamHairAhoge', s * 10);
+      setCoreParam(core, 'ParamMouthOpenY', s * 0.28);
+    }
+  },
+  {
+    name: 'curious_peek',
+    duration: 3600,
+    animate: (p, core) => {
+      const s = Math.sin(p * Math.PI);
+      setCoreParam(core, 'ParamAngleY', s * 16 - 2);
+      setCoreParam(core, 'ParamEyeBallY', s * 0.85);
+      setCoreParam(core, 'ParamEyeLOpen', 1.0 + s * 0.18);
+      setCoreParam(core, 'ParamEyeROpen', 1.0 + s * 0.18);
+      setCoreParam(core, 'ParamBrowLY', 0.38);
+      setCoreParam(core, 'ParamBrowRY', 0.38);
+    }
+  }
+];
+
+const CARE_DATABASE = {
+  late_night: {
+    tag: '🌙 深夜关怀',
+    lines: [
+      "夜已经很深了呢… 主人要早点休息，明天才会元气满满哦~ 🌙",
+      "还在忙吗？日和在这里陪着你，但也别太勉强自己，快去睡觉吧 💤",
+      "哈欠~ 眼睛酸不酸呀？喝口温水，准备盖好被子睡觉啦 🍵",
+      "熬夜对身体很不好的… 主人乖，把今天的事情留给明天吧 🌸",
+      "听日和的话，电脑屏幕看久了很累的，快闭上眼睛休息一会儿吧~ ✨",
+      "夜猫子主人！日和已经困得眼睛快睁不开啦，我们一起去睡觉好不好呀 😴",
+      "凌晨的微风很凉呢，如果还在工作的话，记得披一件厚外套哦 🧥",
+      "星星都睡着啦，主人也该钻进温暖的被窝啦，晚安好梦~ 🌟",
+      "工作虽然重要，但日和最关心的还是主人的身体健康呀，早点休息好不好 🥺"
+    ]
+  },
+  morning: {
+    tag: '☀️ 晨间问候',
+    lines: [
+      "早上好呀主人！又是元气满满的新一天，日和今天也会一直陪着你哦 ☀️",
+      "新的一天开始啦！吃过热气腾腾的早餐了吗？今天也要加油呀 🍳",
+      "哈喽~ 看到精神饱满的主人真开心，今天遇到什么困难都可以告诉我哦 🌸",
+      "早晨的空气真清新呢！工作学习累了记得起来活动活动伸个懒腰~ 🌻",
+      "早上好！日和已经把今天的元气活力全部充饱啦，随时待命！💪",
+      "新的一天，保持好心情哦！记得多喝温水，开启高效的一天 🥤"
+    ]
+  },
+  afternoon: {
+    tag: '☕ 午后小憩',
+    lines: [
+      "下午好呀~ 感觉有点困了吗？要不要来一杯香浓的咖啡或者清茶提提神 ☕",
+      "工作辛苦啦！转转手腕、活动一下脖子，日和给你捶捶肩~ 💆‍♀️",
+      "午后的小憩时间到啦，闭目养神五分钟会更有灵感和效率哦 🍰",
+      "日和在桌前默默给你加油打气呢！主人一直都很努力、超级棒的~ ✨",
+      "保持专注的主人真帅气！不过也要注意坐姿，不要驼背哦 🪑"
+    ]
+  },
+  evening: {
+    tag: '🌆 晚间陪伴',
+    lines: [
+      "晚上好呀！今天辛苦一整天啦，有没有吃上一顿热气腾腾的晚饭呢 🍲",
+      "夜幕降临啦，今晚也要劳逸结合，好好享受属于自己的惬意时光哦 🌙",
+      "忙碌了一整天，听听舒缓的音乐放松一下紧绷的神经吧 🎵",
+      "日和一直都在这里陪着你呢，有什么开心的或者烦恼的事都可以和我说说呀 🌸",
+      "夜色很温柔呢，今天的主人也超级努力了，日和为你点赞 👍"
+    ]
+  }
+};
+
+const FOOD_DATABASE = {
+  cake: { name: '草莓奶油蛋糕', emoji: '🍰' },
+  dango: { name: '三色团子', emoji: '🍡' },
+  boba: { name: '珍珠奶茶', emoji: '🧋' },
+  cookie: { name: '巧克力曲奇', emoji: '🍪' },
+  ramen: { name: '热腾拉面', emoji: '🍜' },
+  icecream: { name: '香草甜筒', emoji: '🍦' }
+};
+
+const FORTUNE_LIST = [
+  { rank: '🌸 超级大吉', desc: '今天运势满分！遇到的一切都会超级顺利，好运像樱花一样盛开！🍀 幸运色：樱粉色' },
+  { rank: '✨ 事业大吉', desc: '灵感如泉涌，今天写的代码绝对 0 报错，工作学习事半功倍！💪 幸运色：香槟金' },
+  { rank: '💖 桃花美满', desc: '今天周围的人都会对你格外温柔，小日和的好感度也悄悄翻倍哦！🌸 幸运色：蜜桃粉' },
+  { rank: '🍵 顺心安康', desc: '平稳惬意的一天，适合来一杯香浓下午茶，享受属于自己的宁静时光。🍰 幸运色：抹茶绿' }
+];
+
+const LIFE_DATA_KEY = 'hiyori_life_save_v2';
+let lifeData = {
+  affection: 18,
+  level: 1,
+  satiety: 40,
+  lastDigestedHour: new Date().getHours(),
+  dailyExpGained: 0,
+  lastExpDay: new Date().toDateString(),
+  currentEvent: null,
+  cravingFood: null,
+  cravingFoodName: '',
+  focusSecondsLeft: 0,
+  focusTimerActive: false
+};
+
+try {
+  const saved = localStorage.getItem(LIFE_DATA_KEY);
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    lifeData.affection = parsed.affection || 18;
+    lifeData.satiety = typeof parsed.satiety === 'number' ? parsed.satiety : 40;
+    lifeData.dailyExpGained = parsed.dailyExpGained || 0;
+    lifeData.lastExpDay = parsed.lastExpDay || new Date().toDateString();
+    if (lifeData.lastExpDay !== new Date().toDateString()) {
+      lifeData.dailyExpGained = 0;
+      lifeData.lastExpDay = new Date().toDateString();
+    }
+  }
+} catch(e) {}
+
+// ============================================================
+// 2. GLOBAL STATE VARIABLES (TOP DECLARED)
+// ============================================================
+const PROXIMITY_ENTER_DIST = 175;
+const PROXIMITY_LEAVE_DIST = 195;
+let gazeState = 'READY_TO_APPROACH'; // 'READY_TO_APPROACH', 'GAZING_ACTIVE', 'WAITING_FOR_LEAVE'
+let gazeLastMoveTime = 0;
+let gazeStartTime = 0;
+
+let model = null;
+let petState = 'idle';
+let lastInputTime = Date.now();
+let lastKeyPressTime = 0;
+let targetMouseX = 0;
+let targetMouseY = 0;
+let currentMouseX = 0;
+let currentMouseY = 0;
+let prevMouseX = 0;
+let prevMouseY = 0;
+let timeElapsed = 0;
+let trackWeight = 0.0;
+
+let activeProceduralAction = null;
+let proceduralStartTime = 0;
+let proceduralDuration = 0;
+let lastActionTime = Date.now();
+let nextActionInterval = 10000;
+
+let careBubbleTimer = null;
+let recentCareLines = [];
+let keyElements = [];
+
+// Initialize PixiJS Application
 const app = new PIXI.Application({
   view: document.createElement('canvas'),
   autoStart: true,
@@ -280,106 +992,510 @@ const app = new PIXI.Application({
   autoDensity: true,
 });
 document.getElementById('canvas-container').appendChild(app.view);
+window.app = app;
 
-let model = null;
-let petState = 'idle'; // 'typing', 'mouse_moving', 'idle', 'sleep'
-let lastInputTime = Date.now();
-let targetMouseX = 0;
-let targetMouseY = 0;
-let currentMouseX = 0;
-let currentMouseY = 0;
-let keyElements = [];
+window.setLive2DRenderingActive = function(active) {
+  if (window.app && window.app.ticker) {
+    if (active) {
+      if (!window.app.ticker.started) window.app.ticker.start();
+    } else {
+      if (window.app.ticker.started) window.app.ticker.stop();
+    }
+  }
+};
 
-function updateStatusBadge(text) {
-  const badge = document.getElementById('emotion-badge');
-  if (badge) badge.textContent = text;
+// ============================================================
+// 3. ALL CORE HELPER FUNCTIONS
+// ============================================================
+function setCoreParam(core, id, value) {
+  try {
+    const idx = core.getParameterIndex ? core.getParameterIndex(id) : -1;
+    if (idx >= 0 && core.setParameterValueByIndex) {
+      core.setParameterValueByIndex(idx, value);
+    } else if (core.setParamFloat) {
+      core.setParamFloat(id, value);
+    }
+  } catch(e) {}
 }
 
-// Compact Layout: Scale 0.145 fits perfectly into 190x235 window
+function getCoreParam(core, id) {
+  try {
+    const idx = core.getParameterIndex ? core.getParameterIndex(id) : -1;
+    if (idx >= 0 && core.getParameterValueByIndex) {
+      return core.getParameterValueByIndex(idx);
+    } else if (core.getParamFloat) {
+      return core.getParamFloat(id);
+    }
+  } catch(e) {}
+  return 0;
+}
+
+function blendCoreParam(core, id, targetVal, weight) {
+  if (weight <= 0) return;
+  if (weight >= 1) {
+    setCoreParam(core, id, targetVal);
+    return;
+  }
+  const current = getCoreParam(core, id);
+  setCoreParam(core, id, current * (1.0 - weight) + targetVal * weight);
+}
+
+function setCorePartOpacity(core, id, opacity) {
+  try {
+    const idx = core.getPartIndex ? core.getPartIndex(id) : -1;
+    if (idx >= 0 && core.setPartOpacityByIndex) {
+      core.setPartOpacityByIndex(idx, opacity);
+    }
+  } catch(e) {}
+}
+
+
+// ============================================================
+// 🌸 春日专属 边缘收起与双手扒边探头切换状态机
+// ============================================================
+let currentEdgeDock = null; // null | 'left' | 'right'
+
+function onEdgeDockStateChanged(dockSide) {
+  currentEdgeDock = dockSide;
+  const deskStage = document.getElementById('desk-stage');
+  const statusBadge = document.getElementById('status-badge');
+  const timerPill = document.getElementById('focus-timer-pill');
+  const careBubble = document.getElementById('care-bubble');
+  const peekerR = document.getElementById('peeker-img-right');
+  const peekerL = document.getElementById('peeker-img-left');
+
+  if (dockSide === 'right') {
+    if (model) model.visible = false;
+    if (deskStage) deskStage.classList.add('desk-hidden');
+    if (statusBadge) statusBadge.classList.remove('badge-visible');
+    if (timerPill) timerPill.classList.add('timer-pill-hidden');
+    if (careBubble) careBubble.classList.add('care-bubble-hidden');
+
+    if (peekerR) peekerR.style.display = 'block';
+    if (peekerL) peekerL.style.display = 'none';
+  } else if (dockSide === 'left') {
+    if (model) model.visible = false;
+    if (deskStage) deskStage.classList.add('desk-hidden');
+    if (statusBadge) statusBadge.classList.remove('badge-visible');
+    if (timerPill) timerPill.classList.add('timer-pill-hidden');
+    if (careBubble) careBubble.classList.add('care-bubble-hidden');
+
+    if (peekerL) peekerL.style.display = 'block';
+    if (peekerR) peekerR.style.display = 'none';
+  } else {
+    if (model) model.visible = true;
+    if (deskStage) deskStage.classList.remove('desk-hidden');
+    if (peekerR) peekerR.style.display = 'none';
+    if (peekerL) peekerL.style.display = 'none';
+  }
+}
+window.onEdgeDockStateChanged = onEdgeDockStateChanged;
+
+
 function layoutModel() {
   if (!model) return;
-  const w = window.innerWidth || 190;
-  const h = window.innerHeight || 235;
+  const w = window.innerWidth || 205;
+  const h = window.innerHeight || 305;
 
   const targetScale = 0.145;
   model.scale.set(targetScale, targetScale);
-  
   model.anchor.set(0.5, 0.0);
-  model.position.set(w * 0.5, 4);
-
-  console.log(`[Live2D] Compact Layout: scale=${targetScale}, top pos=(${w*0.5}, 4)`);
+  model.position.set(w * 0.5, 72);
 }
 
-window.addEventListener('resize', layoutModel);
+function playNamedProceduralAction(actionName) {
+  const action = PROCEDURAL_ACTIONS.find(a => a.name === actionName);
+  if (action) {
+    activeProceduralAction = action;
+    proceduralStartTime = Date.now();
+    proceduralDuration = action.duration;
+  }
+}
 
-// Load Official Live2D Model
-const MODEL_PATH = 'live2d_model/Hiyori/Hiyori.model3.json';
-PIXI.live2d.Live2DModel.from(MODEL_PATH, {
-  autoInteract: false
-}).then(loadedModel => {
-  model = loadedModel;
-  app.stage.addChild(model);
+function playRandomAction() {
+  if (!model || petState === 'sleep' || trackWeight > 0.3 || activeProceduralAction) return;
 
-  layoutModel();
+  const rand = Math.random();
+  if (rand < 0.5 && model.motion) {
+    const chosen = ALL_MOTIONS[Math.floor(Math.random() * ALL_MOTIONS.length)];
+    try {
+      model.motion(chosen.name);
+    } catch(e) {}
+  } else {
+    const chosenProc = PROCEDURAL_ACTIONS[Math.floor(Math.random() * PROCEDURAL_ACTIONS.length)];
+    playNamedProceduralAction(chosenProc.name);
+  }
+}
 
-  if (model.internalModel && model.internalModel.motionManager) {
-    model.internalModel.motionManager.stopAllMotions();
+function getCurrentTimeSlot() {
+  const h = new Date().getHours();
+  if (h >= 0 && h < 7) return 'late_night';
+  if (h >= 7 && h < 11 || (h === 11 && new Date().getMinutes() < 30)) return 'morning';
+  if (h >= 11 && h < 18) return 'afternoon';
+  return 'evening';
+}
+
+// 🔔 甜美清脆番茄钟/到点闹钟水晶音效 (受全局声音开关控制)
+window._soundEnabled = false;
+window.setSoundEnabled = function(enabled) {
+  window._soundEnabled = !!enabled;
+  console.log('[Audio] Sound enabled set to:', window._soundEnabled);
+};
+
+function playAlarmChime() {
+  if (!window._soundEnabled) {
+    console.log('[Audio] Sound muted, skipping chime.');
+    return;
+  }
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    // 悦耳的高音四音符琶音: C6 -> E6 -> G6 -> C7 (1046Hz, 1318Hz, 1568Hz, 2093Hz)
+    const notes = [1046.5, 1318.5, 1567.98, 2093.0];
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.13);
+
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + idx * 0.13);
+      gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + idx * 0.13 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + idx * 0.13 + 0.75);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + idx * 0.13);
+      osc.stop(ctx.currentTime + idx * 0.13 + 0.8);
+    });
+  } catch(e) {
+    console.log('[Audio] Chime play error:', e);
+  }
+}
+window.playAlarmChime = playAlarmChime;
+
+function showCareMessage(tag, text) {
+  const bubble = document.getElementById('care-bubble');
+  const textEl = document.getElementById('care-bubble-text');
+  const tagEl = document.getElementById('care-time-tag');
+
+  if (bubble && textEl && tagEl) {
+    tagEl.textContent = tag;
+    textEl.textContent = text;
+    bubble.classList.remove('care-bubble-hidden');
+
+    // 播放清脆悦耳的番茄钟/提醒叮咚声
+    playAlarmChime();
+
+    clearTimeout(careBubbleTimer);
+    careBubbleTimer = setTimeout(() => {
+      dismissCareBubble();
+    }, 9000);
+  }
+}
+
+function dismissCareBubble() {
+  const bubble = document.getElementById('care-bubble');
+  if (bubble) bubble.classList.add('care-bubble-hidden');
+  clearTimeout(careBubbleTimer);
+}
+
+function triggerTimeBasedCare(force = false) {
+  const slotKey = getCurrentTimeSlot();
+  const slotData = CARE_DATABASE[slotKey];
+  if (!slotData) return;
+
+  let availableLines = slotData.lines.filter(l => !recentCareLines.includes(l));
+  if (availableLines.length === 0) {
+    recentCareLines = [];
+    availableLines = slotData.lines;
   }
 
-  // Hide loader
-  const loader = document.getElementById('loader-ui');
-  if (loader) {
-    loader.style.opacity = '0';
-    setTimeout(() => loader.style.display = 'none', 400);
+  const chosenLine = availableLines[Math.floor(Math.random() * availableLines.length)];
+  recentCareLines.push(chosenLine);
+  if (recentCareLines.length > 5) recentCareLines.shift();
+
+  showCareMessage(slotData.tag, chosenLine);
+
+  if (model && model.motion && !activeProceduralAction) {
+    try {
+      const tapMotions = slotKey === 'morning' ? ['FlickUp', 'Tap'] : slotKey === 'late_night' ? ['FlickDown', 'Tap@Body'] : ['Tap', 'Flick'];
+      const m = tapMotions[Math.floor(Math.random() * tapMotions.length)];
+      model.motion(m);
+    } catch(e) {}
   }
+}
 
-  console.log('[Live2D] 🎉 官方桃濑日和 (精致小巧版) 已就绪!');
-  updateStatusBadge('✨ 桃濑日和已就绪');
-
-  keyElements = Array.from(document.querySelectorAll('.kb-key'));
-
-  if (window._pb && window._pb.onModelLoaded) {
-    window._pb.onModelLoaded();
+// 🎯 严格精准3状态靠近注视状态机 (带暴力即时打断与智能复位)
+function interruptAllIdleMotions() {
+  activeProceduralAction = null;
+  if (model && model.internalModel && model.internalModel.motionManager) {
+    try {
+      model.internalModel.motionManager.stopAllMotions();
+    } catch(e) {}
   }
+}
 
-  // Start continuous render loop
-  app.ticker.add(updateLive2DParams);
-
-}).catch(err => {
-  console.error('[Live2D] Failed to load model:', err);
-  const text = document.getElementById('loader-text');
-  if (text) text.textContent = '❌ 加载失败: ' + err.message;
-});
-
-// Update Live2D Parameters Every Frame
-let timeElapsed = 0;
-function updateLive2DParams(delta) {
-  if (!model || !model.internalModel || !model.internalModel.coreModel) return;
-  
+function onGlobalMouseMove(normX, normY, distPx = 9999) {
   const now = Date.now();
-  const idleSec = (now - lastInputTime) / 1000;
-  timeElapsed += delta * 0.016;
+  lastInputTime = now;
 
-  // Inactivity state
-  if (idleSec > 32) {
-    if (petState !== 'sleep') {
-      petState = 'sleep';
-      document.getElementById('sleep-fx').style.display = 'block';
-      updateStatusBadge('💤 趴在桌上睡着啦~');
-    }
-  } else if (idleSec > 7) {
-    if (petState !== 'idle') {
-      petState = 'idle';
-      document.getElementById('sleep-fx').style.display = 'none';
-      updateStatusBadge('🌸 趴在桌前发呆中~');
+  targetMouseX = Math.max(-1, Math.min(1, parseFloat(normX) || 0));
+  targetMouseY = Math.max(-1, Math.min(1, parseFloat(normY) || 0));
+
+  const d = parseFloat(distPx) || 9999;
+  const moved = Math.hypot(targetMouseX - prevMouseX, targetMouseY - prevMouseY);
+
+  if (moved > 0.001) {
+    prevMouseX = targetMouseX;
+    prevMouseY = targetMouseY;
+
+    // 状态切换：从外部靠近触发
+    if (gazeState === 'READY_TO_APPROACH') {
+      if (d <= PROXIMITY_ENTER_DIST) {
+        gazeState = 'GAZING_ACTIVE';
+        gazeStartTime = now;
+        gazeLastMoveTime = now;
+        interruptAllIdleMotions(); // 暴力打断一切待机与动作
+
+        if (petState === 'sleep') {
+          petState = 'idle';
+          const sfx = document.getElementById('sleep-fx');
+          if (sfx) sfx.style.display = 'none';
+        }
+      }
+    } else if (gazeState === 'GAZING_ACTIVE') {
+      gazeLastMoveTime = now;
     }
   }
 
-  const lerpSpeed = 0.14;
-  currentMouseX += (targetMouseX - currentMouseX) * lerpSpeed;
-  currentMouseY += (targetMouseY - currentMouseY) * lerpSpeed;
+  // 移出感应范围 (或等待3.5秒后) 自动重置为 READY_TO_APPROACH，下次靠近立刻再次触发
+  if (gazeState === 'WAITING_FOR_LEAVE') {
+    if (d > PROXIMITY_LEAVE_DIST || (now - gazeStartTime > 4500)) {
+      gazeState = 'READY_TO_APPROACH';
+    }
+  }
 
-  const core = model.internalModel.coreModel;
+  const miniMouse = document.getElementById('mini-mouse');
+  const padX = (targetMouseX * 9);
+  const padY = (targetMouseY * 6);
+  if (miniMouse) {
+    miniMouse.style.transform = `translate(${padX}px, ${padY}px)`;
+  }
+}
+window.onGlobalMouseMove = onGlobalMouseMove;
+
+function updateStatusBadge(isTyping, isGazing) {
+  const badge = document.getElementById('status-badge');
+  if (!badge) return;
+
+  if (isTyping) {
+    badge.textContent = '⌨️ 伴工打字中';
+    badge.style.borderColor = 'rgba(255, 105, 180, 0.65)';
+    badge.style.color = '#ff94b8';
+    badge.classList.add('badge-visible');
+  } else if (isGazing) {
+    badge.textContent = '👀 正在看着主人';
+    badge.style.borderColor = 'rgba(255, 180, 105, 0.65)';
+    badge.style.color = '#ffc085';
+    badge.classList.add('badge-visible');
+  } else {
+    badge.classList.remove('badge-visible');
+  }
+}
+
+function calculateLevel(exp) {
+  if (exp >= 600) return 4;
+  if (exp >= 300) return 3;
+  if (exp >= 100) return 2;
+  return 1;
+}
+lifeData.level = calculateLevel(lifeData.affection);
+
+function saveLifeData() {
+  try {
+    localStorage.setItem(LIFE_DATA_KEY, JSON.stringify({
+      affection: lifeData.affection,
+      satiety: lifeData.satiety,
+      dailyExpGained: lifeData.dailyExpGained,
+      lastExpDay: lifeData.lastExpDay
+    }));
+  } catch(e) {}
+}
+
+function addAffection(amount, reason = '') {
+  if (lifeData.lastExpDay !== new Date().toDateString()) {
+    lifeData.dailyExpGained = 0;
+    lifeData.lastExpDay = new Date().toDateString();
+  }
+
+  const allowedExp = Math.max(0, Math.min(amount, 60 - lifeData.dailyExpGained));
+  lifeData.affection = Math.min(1000, lifeData.affection + allowedExp);
+  lifeData.dailyExpGained += allowedExp;
+  lifeData.level = calculateLevel(lifeData.affection);
+  saveLifeData();
+
+  for (let i = 0; i < 4; i++) {
+    setTimeout(() => spawnHeartFx(), i * 150);
+  }
+}
+
+function spawnHeartFx(symbol = '💖') {
+  const h = document.createElement('div');
+  h.className = 'heart-fx';
+  h.textContent = symbol;
+  h.style.left = (40 + Math.random() * 55) + 'px';
+  h.style.top = (65 + Math.random() * 20) + 'px';
+  h.style.setProperty('--dx', ((Math.random() - 0.5) * 40) + 'px');
+  document.body.appendChild(h);
+  setTimeout(() => h.remove(), 900);
+}
+
+function triggerHeadpat() {
+  spawnHeartFx('🌸');
+  spawnHeartFx('💖');
+
+  if (lifeData.currentEvent === 'depressed') {
+    lifeData.currentEvent = null;
+    playNamedProceduralAction('comforted_happy');
+    addAffection(8, '抚慰委屈沮丧');
+    showCareMessage('💖 治愈时刻', '哇… 被主人摸摸头的一瞬间，所有难过都飞走啦！最喜欢主人了~ 🌸 (+8 羁绊)');
+    dismissSnackTray();
+  } else {
+    playNamedProceduralAction('comforted_happy');
+    addAffection(2, '日常摸摸头');
+    showCareMessage('🌸 摸摸头~', '主人摸摸头好舒服呀~ 心里暖洋洋的！(蹭蹭~ ✨)');
+  }
+}
+
+function feedSnack(foodKey, foodName) {
+  dismissSnackTray();
+
+  if (lifeData.satiety >= 80) {
+    playNamedProceduralAction('tea_sip');
+    showCareMessage('😋 已经吃饱啦', '呼~ 小肚子已经吃得圆滚滚的啦，日和现在吃不下啦，谢谢贴心的主人~ 🍰');
+    return;
+  }
+
+  const isTarget = lifeData.cravingFood === foodKey;
+  lifeData.satiety = Math.min(100, lifeData.satiety + 30);
+  saveLifeData();
+
+  if (isTarget || !lifeData.cravingFood) {
+    playNamedProceduralAction('chewing_munch');
+    addAffection(10, '喂了想吃的点心');
+    lifeData.currentEvent = null;
+    lifeData.cravingFood = null;
+    showCareMessage('🍰 美味时刻', `嗷呜！(嚼嚼嚼...) 哇啊！正是日和最想吃的【${foodName}】！太美味了！谢谢主人~ ✨ (+10 羁绊)`);
+  } else {
+    if (Math.random() < 0.7) {
+      playNamedProceduralAction('chewing_munch');
+      addAffection(4, '品尝点心');
+      lifeData.currentEvent = null;
+      lifeData.cravingFood = null;
+      showCareMessage('🍰 尝尝看~', `唔！(嚼嚼嚼...) 虽然不是最想吃的，但也超级好吃呀！谢谢主人~ 😋 (+4 羁绊)`);
+    } else {
+      playNamedProceduralAction('tsundere_pout');
+      showCareMessage('😤 撒娇拒食', `唔… 可是日和现在满脑子都只想吃【${lifeData.cravingFoodName}】嘛~ (戳手指撒娇)`);
+    }
+  }
+}
+
+function showSnackTray() {
+  const tray = document.getElementById('snack-tray');
+  if (tray) tray.classList.remove('tray-hidden');
+}
+
+function dismissSnackTray() {
+  const tray = document.getElementById('snack-tray');
+  if (tray) tray.classList.add('tray-hidden');
+}
+
+function showTimerModal() {
+  dismissSnackTray();
+  const modal = document.getElementById('timer-modal');
+  if (modal) modal.classList.remove('modal-hidden');
+}
+
+function dismissTimerModal() {
+  const modal = document.getElementById('timer-modal');
+  if (modal) modal.classList.add('modal-hidden');
+}
+
+let tomatoInterval = null;
+function startFocusTimer(minutes) {
+  dismissTimerModal();
+  const mins = Math.max(1, Math.min(180, parseInt(minutes) || 25));
+  lifeData.focusSecondsLeft = mins * 60;
+  lifeData.focusTimerActive = true;
+  lifeData.focusTotalMinutes = mins;
+
+  showCareMessage('🍅 专注模式开启', `已设定【${mins} 分钟】专注倒计时！日和会在桌前安静陪伴主人，加油哦~ 💪`);
+  playNamedProceduralAction('curious_peek');
+
+  clearInterval(tomatoInterval);
+  tomatoInterval = setInterval(() => {
+    lifeData.focusSecondsLeft--;
+    if (lifeData.focusSecondsLeft <= 0) {
+      clearInterval(tomatoInterval);
+      lifeData.focusTimerActive = false;
+      playNamedProceduralAction('ribbon_dance');
+      const earnedExp = Math.min(25, Math.max(5, Math.floor(mins * 0.5)));
+      addAffection(earnedExp, `完成${mins}分钟专注`);
+      showCareMessage('🎉 专注大成功！', `叮铃铃~ 【${mins} 分钟】专注顺利完成！主人超级厉害！快站起来伸个懒腰休息一会儿吧~ ✨ (+${earnedExp} 羁绊)`);
+    }
+  }, 1000);
+}
+
+function startCustomTimer() {
+  const input = document.getElementById('custom-minutes-input');
+  const val = input ? parseInt(input.value) : 30;
+  startFocusTimer(val);
+}
+
+function drawDailyFortune() {
+  const chosen = FORTUNE_LIST[Math.floor(Math.random() * FORTUNE_LIST.length)];
+  playNamedProceduralAction('idea_sparkle');
+  addAffection(4, '每日抽签');
+  showCareMessage(chosen.rank, `${chosen.desc} (+4 羁绊)`);
+}
+
+function showAffectionDetails() {
+  const levelNames = ['初识萌动 🌸', '默契相伴 💖', '依偎信赖 🎀', '心灵羁绊 ✨'];
+  const curName = levelNames[Math.min(3, lifeData.level - 1)];
+  const nextLevelExp = [100, 300, 600, 1000][Math.min(3, lifeData.level - 1)];
+  const satietyDesc = lifeData.satiety >= 80 ? '超饱 (吃不下啦~)' : lifeData.satiety >= 40 ? '适中' : '有点饿啦';
+  
+  showCareMessage('💖 羁绊状态', `与春日和的羁绊：【${curName} (Lv.${lifeData.level})】！累计好感：${lifeData.affection}/${nextLevelExp} EXP | 饱腹度：${lifeData.satiety}% (${satietyDesc}) | 今日经验：${lifeData.dailyExpGained}/60`);
+}
+
+// Global bridges for Python Qt tray menu
+window.triggerPetHeadpat = triggerHeadpat;
+window.triggerFeedSnackPrompt = () => {
+  if (lifeData.satiety >= 80) {
+    playNamedProceduralAction('tea_sip');
+    showCareMessage('😋 已经吃饱啦', '呼~ 小肚子已经吃得圆滚滚的啦，日和现在吃不下啦，谢谢贴心的主人~ 🍰');
+  } else {
+    showSnackTray();
+    showCareMessage('🍰 投喂点心', '主人想喂日和吃什么美味点心呀？快在下方托盘选择吧~ 🌸');
+  }
+};
+window.triggerStartPomodoro = showTimerModal;
+window.triggerDrawFortune = drawDailyFortune;
+window.triggerShowAffection = showAffectionDetails;
+
+// ============================================================
+// 4. LIVE2D OVERRIDES & RENDER LOOP (Guaranteed Execution)
+// ============================================================
+function applyLive2DOverrides(core) {
+  if (!core) return;
+  const now = Date.now();
+  const timeSinceKey = now - lastKeyPressTime;
+  const isTyping = timeSinceKey < 1200;
+  const isGazing = (gazeState === 'GAZING_ACTIVE');
 
   setCorePartOpacity(core, 'PartArmA', 1.0);
   setCorePartOpacity(core, 'PartArmB', 0.0);
@@ -389,203 +1505,256 @@ function updateLive2DParams(delta) {
     setCoreParam(core, 'ParamAngleX', Math.sin(timeElapsed * 0.4) * 4);
     setCoreParam(core, 'ParamAngleY', -24 + sleepBreath * 8);
     setCoreParam(core, 'ParamAngleZ', 8);
+    setCoreParam(core, 'ParamEyeBallX', 0);
+    setCoreParam(core, 'ParamEyeBallY', -0.6);
     setCoreParam(core, 'ParamBodyAngleX', 2);
-    setCoreParam(core, 'ParamBodyAngleY', -10);
+    setCoreParam(core, 'ParamBodyAngleY', -8);
     setCoreParam(core, 'ParamEyeLOpen', 0);
     setCoreParam(core, 'ParamEyeROpen', 0);
     setCoreParam(core, 'ParamMouthOpenY', 0);
+    setCoreParam(core, 'ParamCheek', 0.15);
     setCoreParam(core, 'ParamBreath', 0.5 + sleepBreath);
-    
     setCoreParam(core, 'ParamShoulder', -0.3);
-    setCoreParam(core, 'ParamArmLA', 0.2);
-    setCoreParam(core, 'ParamArmRA', 0.2);
-  } else if (petState === 'typing') {
-    const typeBob = Math.sin(now * 0.02) * 2.5;
+  } else if (isGazing || isTyping || trackWeight > 0.01) {
+    // 🌟 注视主人 / 伴工打字 拥有 100% 最高统治优先级 (彻底打断任何待机动作)
+    activeProceduralAction = null;
 
-    setCoreParam(core, 'ParamAngleX', currentMouseX * 14);
-    setCoreParam(core, 'ParamAngleY', -10 + Math.abs(typeBob));
-    setCoreParam(core, 'ParamAngleZ', typeBob * 0.8);
-    setCoreParam(core, 'ParamEyeBallX', currentMouseX * 0.5);
-    setCoreParam(core, 'ParamEyeBallY', -0.5);
-    setCoreParam(core, 'ParamBodyAngleX', currentMouseX * 6);
-    setCoreParam(core, 'ParamMouthOpenY', 0.15);
-    setCoreParam(core, 'ParamBreath', 0.5 + Math.sin(timeElapsed * 3) * 0.2);
+    blendCoreParam(core, 'ParamAngleX', currentMouseX * 30, trackWeight);
+    blendCoreParam(core, 'ParamAngleY', currentMouseY * 24 - 3, trackWeight);
+    blendCoreParam(core, 'ParamAngleZ', currentMouseX * 10, trackWeight);
+    blendCoreParam(core, 'ParamEyeBallX', currentMouseX * 1.0, trackWeight);
+    blendCoreParam(core, 'ParamEyeBallY', currentMouseY * 1.0, trackWeight);
+    blendCoreParam(core, 'ParamBrowLY', currentMouseY * 0.35, trackWeight);
+    blendCoreParam(core, 'ParamBrowRY', currentMouseY * 0.35, trackWeight);
+    blendCoreParam(core, 'ParamBodyAngleX', currentMouseX * 8, trackWeight);
 
-    setCoreParam(core, 'ParamShoulder', -0.1);
-    setCoreParam(core, 'ParamArmLA', 0.3);
-    setCoreParam(core, 'ParamArmRA', 0.3);
+    if (isTyping) {
+      setCoreParam(core, 'ParamCheek', 0.55);
+      setCoreParam(core, 'ParamMouthOpenY', 0.12);
+      setCoreParam(core, 'ParamEyeLSmile', 0.65);
+      setCoreParam(core, 'ParamEyeRSmile', 0.65);
+    }
   } else {
-    const breath = Math.sin(timeElapsed * 2.0) * 0.2;
-    const wander = Math.sin(timeElapsed * 0.8) * 4;
-    
-    setCoreParam(core, 'ParamAngleX', currentMouseX * 28 + wander);
-    setCoreParam(core, 'ParamAngleY', currentMouseY * 24 - 4 + breath * 4);
-    setCoreParam(core, 'ParamAngleZ', currentMouseX * 10);
-    setCoreParam(core, 'ParamEyeBallX', currentMouseX * 0.8);
-    setCoreParam(core, 'ParamEyeBallY', currentMouseY * 0.8);
-    setCoreParam(core, 'ParamBodyAngleX', currentMouseX * 10);
-    setCoreParam(core, 'ParamBreath', 0.5 + breath);
-
-    setCoreParam(core, 'ParamShoulder', -0.2);
-    setCoreParam(core, 'ParamArmLA', 0.2);
-    setCoreParam(core, 'ParamArmRA', 0.2);
-
-    const blinkCycle = timeElapsed % 3.8;
-    if (blinkCycle < 0.15) {
-      const blinkVal = Math.sin((blinkCycle / 0.15) * Math.PI);
-      setCoreParam(core, 'ParamEyeLOpen', 1 - blinkVal);
-      setCoreParam(core, 'ParamEyeROpen', 1 - blinkVal);
-    } else {
-      setCoreParam(core, 'ParamEyeLOpen', 1);
-      setCoreParam(core, 'ParamEyeROpen', 1);
+    // 待机发呆动作 (仅在没有注视、没有打字时执行)
+    if (activeProceduralAction) {
+      const elapsedAction = now - proceduralStartTime;
+      const progress = Math.min(1.0, elapsedAction / proceduralDuration);
+      if (progress >= 1.0) {
+        activeProceduralAction = null;
+      } else {
+        activeProceduralAction.animate(progress, core);
+      }
     }
   }
 }
 
-function setCoreParam(core, id, value) {
+function updateLive2DParams(delta) {
   try {
-    if (core.setParameterValueById) {
-      core.setParameterValueById(id, value);
-    } else if (core.setParamFloat) {
-      core.setParamFloat(id, value);
+    const now = Date.now();
+    const timeSinceKey = now - lastKeyPressTime;
+    const idleSec = (now - lastInputTime) / 1000;
+    const dt = (delta || 1) * 0.016;
+    timeElapsed += dt;
+
+    const isTyping = timeSinceKey < 1200;
+
+    // 检查注视状态：停下满2秒或单次注视满8秒则回归待机发呆
+    if (gazeState === 'GAZING_ACTIVE') {
+      const timeSinceMove = now - gazeLastMoveTime;
+      const sessionDuration = now - gazeStartTime;
+      if (timeSinceMove >= 2000 || sessionDuration > 8000) {
+        gazeState = 'WAITING_FOR_LEAVE'; // 回归待机发呆，圈内再动不打扰
+      } else {
+        if (activeProceduralAction) {
+          activeProceduralAction = null; // 靠近注视拥有最高优先级，立即打断待机动作
+        }
+      }
     }
-  } catch (e) {}
+
+    const isGazing = (gazeState === 'GAZING_ACTIVE');
+
+    updateStatusBadge(isTyping, isGazing);
+
+    // 待机随机动作调度 (发呆时每8~17秒自然触发)
+    if (!isGazing && !isTyping && petState !== 'sleep' && !activeProceduralAction && trackWeight <= 0.05) {
+      if (now - lastActionTime > nextActionInterval) {
+        lastActionTime = now;
+        nextActionInterval = (8 + Math.random() * 9) * 1000;
+        playRandomAction();
+      }
+    }
+
+    // 权重平滑插值 (0.0 = 纯发呆动作, 1.0 = 纯注视主人)
+    const targetWeight = (isGazing || isTyping) ? 1.0 : 0.0;
+    const blendSpeed = isGazing ? 0.45 : 0.12;
+    trackWeight += (targetWeight - trackWeight) * blendSpeed;
+    if (trackWeight < 0.005) trackWeight = 0.0;
+    if (trackWeight > 0.995) trackWeight = 1.0;
+
+    // 鼠标坐标灵敏插值 (Snappy, responsive eye tracking)
+    const lerpSpeed = 0.48;
+    currentMouseX += (targetMouseX - currentMouseX) * lerpSpeed;
+    currentMouseY += (targetMouseY - currentMouseY) * lerpSpeed;
+
+    // 挂机酣睡 (>35s)
+    if (idleSec > 35 && !activeProceduralAction) {
+      if (petState !== 'sleep') {
+        petState = 'sleep';
+        const sfx = document.getElementById('sleep-fx');
+        if (sfx) sfx.style.display = 'block';
+      }
+    } else if (!isTyping && petState === 'sleep') {
+      petState = 'idle';
+      const sfx = document.getElementById('sleep-fx');
+      if (sfx) sfx.style.display = 'none';
+    }
+  } catch(err) {
+    console.error('[Live2D Render Loop Error]:', err);
+  }
 }
 
-function setCorePartOpacity(core, id, value) {
+async function loadHiyoriModel() {
+  const modelUrl = 'live2d_model/HiyoriPro/hiyori_pro_t11.model3.json';
+  console.log('[Live2D] Loading Hiyori model from:', modelUrl);
+
   try {
-    if (core.setPartOpacityById) {
-      core.setPartOpacityById(id, value);
-    } else if (core.setPartOpacity) {
-      core.setPartOpacity(id, value);
+    model = await PIXI.live2d.Live2DModel.from(modelUrl, {
+      autoInteract: false,
+      idleMotionGroupName: 'Idle'
+    });
+
+    layoutModel();
+    app.stage.addChild(model);
+
+    if (model.internalModel && model.internalModel.coreModel) {
+      const core = model.internalModel.coreModel;
+      setCorePartOpacity(core, 'PartArmA', 1.0);
+      setCorePartOpacity(core, 'PartArmB', 0.0);
+      setCoreParam(core, 'ParamAngleY', -3);
+      setCoreParam(core, 'ParamCheek', 0.18);
+      if (core.update) core.update();
     }
-  } catch (e) {}
+
+    const loader = document.getElementById('loader-ui');
+    if (loader) {
+      loader.style.opacity = '0';
+      setTimeout(() => loader.remove(), 500);
+    }
+
+    console.log('[Live2D] 🌸 官方日和模型加载成功 (双模混合引擎已就绪)！');
+
+    setTimeout(() => {
+      triggerTimeBasedCare(true);
+    }, 1600);
+
+    if (window._pb && window._pb.onModelLoaded) {
+      window._pb.onModelLoaded();
+    }
+
+    // ⭐ Hook motionManager.update to GUARANTEE parameters are applied right after motion curves!
+    if (model.internalModel && model.internalModel.motionManager) {
+      const origMotionUpdate = model.internalModel.motionManager.update.bind(model.internalModel.motionManager);
+      model.internalModel.motionManager.update = function(coreModel, now) {
+        const updated = origMotionUpdate(coreModel, now);
+        applyLive2DOverrides(coreModel);
+        return updated;
+      };
+    }
+
+    app.ticker.add((delta) => {
+      updateLive2DParams(delta);
+    });
+
+  } catch(err) {
+    console.error('[Live2D] Failed to load Hiyori model:', err);
+    const loaderText = document.getElementById('loader-text');
+    if (loaderText) loaderText.textContent = '❌ 加载失败: ' + err.message;
+  }
 }
 
-// Global Keyboard Trigger from Python Hook
-function onGlobalKeyPress(keyName = '') {
+window.onGlobalKeyPress = function(keyName) {
   lastInputTime = Date.now();
-  if (petState === 'sleep') {
-    document.getElementById('sleep-fx').style.display = 'none';
-    updateStatusBadge('✨ 醒来啦！开始打字~');
-  }
-  petState = 'typing';
-  updateStatusBadge('⌨️ 正在同步敲键盘~');
+  lastKeyPressTime = Date.now();
 
   if (keyElements.length > 0) {
-    const randomKey = keyElements[Math.floor(Math.random() * keyElements.length)];
-    randomKey.classList.add('active');
-    setTimeout(() => randomKey.classList.remove('active'), 100);
+    const rIdx = Math.floor(Math.random() * keyElements.length);
+    const k = keyElements[rIdx];
+    k.classList.add('active');
+    setTimeout(() => k.classList.remove('active'), 140);
   }
+};
 
-  if (Math.random() < 0.35) {
-    spawnTapParticle();
+window.addEventListener('resize', layoutModel);
+
+window.addEventListener('DOMContentLoaded', () => {
+  keyElements = Array.from(document.querySelectorAll('.kb-key'));
+  loadHiyoriModel();
+});
+
+// ============================================================
+// 5. 窗口拖拽与右键菜单桥接 (Capture Phase Interception)
+// ============================================================
+let isDraggingWindow = false;
+
+window.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  e.stopImmediatePropagation();
+  if (window._pb && window._pb.onRightClick) {
+    window._pb.onRightClick(e.screenX, e.screenY);
   }
-}
-window.onGlobalKeyPress = onGlobalKeyPress;
+  return false;
+}, true);
 
-// Global Mouse Movement Trigger from Python Hook
-function onGlobalMouseMove(normX, normY) {
-  lastInputTime = Date.now();
-  if (petState === 'sleep') {
-    document.getElementById('sleep-fx').style.display = 'none';
-    updateStatusBadge('✨ 醒来啦！');
+window.addEventListener('mousedown', (e) => {
+  if (e.target.closest('#snack-tray') || e.target.closest('#timer-modal') || e.target.closest('#care-bubble') || e.target.closest('#headpat-zone')) {
+    return;
   }
-  if (petState !== 'typing') {
-    petState = 'mouse_moving';
-    updateStatusBadge(normX > 0.3 ? '👉 往右看~' : normX < -0.3 ? '👈 往左看~' : '👀 跟着鼠标看~');
-  }
-
-  targetMouseX = Math.max(-1, Math.min(1, normX));
-  targetMouseY = Math.max(-1, Math.min(1, normY));
-
-  const miniMouse = document.getElementById('mini-mouse');
-  const padX = (targetMouseX * 9);
-  const padY = (targetMouseY * 6);
-  
-  if (miniMouse) {
-    miniMouse.style.transform = `translate(${padX}px, ${padY}px)`;
-  }
-}
-window.onGlobalMouseMove = onGlobalMouseMove;
-
-function onGlobalMouseClick(button = 'left') {
-  lastInputTime = Date.now();
-  const miniMouse = document.getElementById('mini-mouse');
-  if (miniMouse) {
-    miniMouse.classList.add('clicking');
-    setTimeout(() => miniMouse.classList.remove('clicking'), 120);
-  }
-  spawnTapParticle('✨');
-}
-window.onGlobalMouseClick = onGlobalMouseClick;
-
-function spawnTapParticle(symbol = '⌨️') {
-  const p = document.createElement('div');
-  p.className = 'tap-particle';
-  p.textContent = symbol;
-  p.style.left = (25 + Math.random() * 55) + 'px';
-  p.style.bottom = (42 + Math.random() * 12) + 'px';
-  p.style.setProperty('--dx', ((Math.random() - 0.5) * 24) + 'px');
-  document.body.appendChild(p);
-  setTimeout(() => p.remove(), 600);
-}
-
-// Mouse dragging & direct pet interaction
-let isDragging = false;
-document.addEventListener('mousedown', (e) => {
   if (e.button === 0) {
-    isDragging = true;
-    onGlobalKeyPress();
+    isDraggingWindow = true;
     if (window._pb && window._pb.onDragStart) {
       window._pb.onDragStart(e.screenX, e.screenY);
     }
   } else if (e.button === 2) {
+    e.preventDefault();
+    e.stopPropagation();
     if (window._pb && window._pb.onRightClick) {
       window._pb.onRightClick(e.screenX, e.screenY);
     }
   }
-  e.preventDefault();
-}, { passive: false });
+}, true);
 
-document.addEventListener('mousemove', (e) => {
-  if (isDragging && window._pb && window._pb.onDragMove) {
+window.addEventListener('mousemove', (e) => {
+  if (isDraggingWindow && window._pb && window._pb.onDragMove) {
     window._pb.onDragMove(e.screenX, e.screenY);
   }
-});
+}, true);
 
-document.addEventListener('mouseup', () => {
-  if (isDragging) {
-    isDragging = false;
+window.addEventListener('mouseup', (e) => {
+  if (isDraggingWindow) {
+    isDraggingWindow = false;
     if (window._pb && window._pb.onDragEnd) {
       window._pb.onDragEnd();
     }
   }
-});
+}, true);
 
-document.addEventListener('dblclick', (e) => {
-  onGlobalKeyPress();
+window.addEventListener('dblclick', (e) => {
+  if (e.target.closest('#snack-tray') || e.target.closest('#timer-modal') || e.target.closest('#headpat-zone')) {
+    return;
+  }
   if (window._pb && window._pb.onUserDoubleClick) {
     window._pb.onUserDoubleClick();
   }
-  e.preventDefault();
-});
-
-document.addEventListener('contextmenu', (e) => e.preventDefault());
+}, true);
 
 // Setup QWebChannel Transport
-function setupChannel() {
-  if (typeof QWebChannel === 'undefined' || typeof qt === 'undefined' || !qt.webChannelTransport) {
-    setTimeout(setupChannel, 150);
-    return;
-  }
-  new QWebChannel(qt.webChannelTransport, (channel) => {
-    window._pb = channel.objects.pet;
-    console.log('[Live2D] QWebChannel bridge connected successfully!');
+if (typeof QWebChannel !== 'undefined') {
+  new QWebChannel(qt.webChannelTransport, function(channel) {
+    window._pb = channel.objects.petBridge || channel.objects.pet;
+    console.log('[Live2D] window._pb is connected:', !!window._pb);
   });
 }
-setupChannel();
-
 </script>
 </body>
 </html>

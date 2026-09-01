@@ -34,14 +34,15 @@ class SystemTray(QSystemTrayIcon):
         self.config = config
         self.save_config_fn = save_config_fn
 
-        icon_path = ROOT_DIR / "assets" / "icons" / "pet_icon.png"
+        icon_path = ROOT_DIR / "assets" / "icons" / "app_logo.png"
         if icon_path.exists():
             self.setIcon(QIcon(str(icon_path)))
         else:
             self.setIcon(create_fallback_icon())
 
         pet_name = self.config.get("behavior", {}).get("pet_name", "桃濑日和")
-        self.setToolTip(f"{pet_name} · AI 桌面智能助理")
+        app_ver = self.config.get("app_version", "v3.0")
+        self.setToolTip(f"NovaDesk {app_ver} · AI 桌面智能助理 ({pet_name})")
         self._init_menu()
 
         # 双击托盘图标立即唤醒并显示桌宠！

@@ -1,0 +1,306 @@
+{
+  "mcpServers": {
+    "mcp-server-firecrawl": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "firecrawl-mcp"
+      ],
+      "description": "Firecrawl 智能网络爬虫与结构化数据提取 MCP 服务器",
+      "source": "https://github.com/mendableai/firecrawl",
+      "tools": [
+        {
+          "name": "firecrawl_scrape",
+          "description": "带有 JS 渲染的网页抓取与 Markdown 清洗提取"
+        },
+        {
+          "name": "firecrawl_search",
+          "description": "带内容提取的深度全网搜索"
+        },
+        {
+          "name": "firecrawl_crawl",
+          "description": "异步网站深度爬取与 URL 发现"
+        }
+      ]
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest"
+      ],
+      "description": "Chrome DevTools 实时浏览器自动化控制与性能分析 MCP 服务器",
+      "source": "https://github.com/ChromeDevTools/devtools-frontend",
+      "tools": [
+        {
+          "name": "chrome_navigate_page",
+          "description": "使用 Chrome 浏览器打开并导航至指定网页"
+        },
+        {
+          "name": "chrome_performance_insights",
+          "description": "获取网页性能洞察与 Web Vitals 耗时追踪"
+        }
+      ]
+    },
+    "markdownify": {
+      "command": "node",
+      "args": [
+        "dist/index.js"
+      ],
+      "description": "Markdownify 全格式文件与网页转 Markdown MCP 服务器",
+      "tools": [
+        {
+          "name": "convert_to_markdown",
+          "description": "将 PDF、DOCX、XLSX、PPTX、图片或网页内容转换为 Markdown 文本"
+        }
+      ]
+    },
+    "kuaidi100": {
+      "command": "uvx",
+      "args": [
+        "kuaidi100-mcp"
+      ],
+      "description": "快递100 国内首个兼容 MCP 协议的物流服务平台",
+      "source": "https://api.kuaidi100.com",
+      "tools": [
+        {
+          "name": "query_kuaidi_tracking",
+          "description": "全球 3000+ 快递公司单号轨迹追踪"
+        },
+        {
+          "name": "estimate_kuaidi_price_time",
+          "description": "智能时效与寄件运费预估"
+        }
+      ]
+    },
+    "12306-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "12306-mcp"
+      ],
+      "description": "12306 火车票与高铁时刻表搜索 MCP 服务器",
+      "tools": [
+        {
+          "name": "search_12306_tickets",
+          "description": "查询 12306 火车票、高铁余票、时刻表与票价"
+        },
+        {
+          "name": "query_train_stopovers",
+          "description": "查询车次沿途停靠站点与时间"
+        }
+      ]
+    },
+    "xiaohongshu-mcp": {
+      "command": "python",
+      "args": [
+        "xiaohongshu_mcp.py",
+        "--stdio"
+      ],
+      "description": "小红书自动搜索与智能评论互动 MCP Server 2.0",
+      "tools": [
+        {
+          "name": "xhs_search_notes",
+          "description": "搜索小红书热门笔记与互动数据"
+        },
+        {
+          "name": "xhs_get_note_content",
+          "description": "获取小红书笔记正文与评论详情"
+        },
+        {
+          "name": "xhs_post_smart_comment",
+          "description": "AI 智能生成并发布评论"
+        }
+      ]
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "description": "GitHub 官方 API MCP 服务器",
+      "tools": [
+        {
+          "name": "github_search_repos",
+          "description": "全网搜索 GitHub 开源项目"
+        },
+        {
+          "name": "github_issue_manager",
+          "description": "管理仓库 Issues"
+        },
+        {
+          "name": "github_pr_manager",
+          "description": "检查 Pull Requests 状态"
+        }
+      ]
+    },
+    "health_calculator": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://dudu007-healthcalculator.ms.show/gradio_api/mcp/sse",
+        "--transport",
+        "sse-only"
+      ],
+      "description": "人体健康参数与代谢指标计算器 MCP Server",
+      "tools": [
+        {
+          "name": "calculate_health_metrics",
+          "description": "一键计算 BMI、BSA、腰高比、体脂率 BFR、内脏脂肪等综合指标"
+        }
+      ]
+    },
+    "ppt_generator": {
+      "command": "python",
+      "args": [
+        "-m",
+        "plugins.ppt_tools"
+      ],
+      "description": "PPT 生成大师 (PowerPoint Agent)",
+      "tools": [
+        {
+          "name": "generate_presentation_ppt",
+          "description": "根据主题与大纲生成 16:9 高清商务 PPT 演示文稿"
+        }
+      ]
+    },
+    "amap_lbs": {
+      "command": "python",
+      "args": [
+        "-m",
+        "plugins.amap_life_tools"
+      ],
+      "description": "高德地图综合 LBS 与路线规划导航",
+      "tools": [
+        {
+          "name": "amap_route_planning",
+          "description": "高德精准出行路线规划（驾车/公交/骑行/步行导航）"
+        },
+        {
+          "name": "get_city_weather",
+          "description": "实时气温与多日天气预报"
+        }
+      ]
+    },
+    "xhs-publisher": {
+      "command": "python",
+      "args": [
+        "-m",
+        "plugins.xhs_publisher_tools"
+      ],
+      "env": {
+        "DEEPSEEK_API_KEY": "sk-local-authenticated",
+        "BASE_URL": "http://localhost:11434/v1"
+      },
+      "description": "小红书自动登录、文案生成与 3:4 配图自动发布 MCP 服务器 (SoftEgLi/xhs-mcp)"
+    },
+    "python-sandbox": {
+      "command": "python",
+      "args": [
+        "-m",
+        "plugins.python_interpreter"
+      ],
+      "description": "Python 本地安全代码沙箱解释器",
+      "tools": [
+        {
+          "name": "run_python_code",
+          "description": "在本地安全沙箱中运行 Python 代码，返回标准输出和结果"
+        }
+      ]
+    },
+    "computer-control": {
+      "command": "python",
+      "args": [
+        "-m",
+        "plugins.computer_control"
+      ],
+      "description": "桌面操作系统与计算机自动化控制 MCP",
+      "tools": [
+        {
+          "name": "take_screenshot_and_analyze",
+          "description": "屏幕截屏与多模态视觉分析"
+        },
+        {
+          "name": "open_application_or_folder",
+          "description": "打开本地应用程序或工作区文件夹"
+        },
+        {
+          "name": "run_powershell_cmd",
+          "description": "安全执行 PowerShell 指令"
+        }
+      ]
+    },
+    "web-search": {
+      "command": "python",
+      "args": [
+        "-m",
+        "plugins.web_search_news"
+      ],
+      "description": "全网热搜与聚合新闻搜索引擎 MCP",
+      "tools": [
+        {
+          "name": "search_web_news",
+          "description": "实时全网搜索新闻与资讯"
+        },
+        {
+          "name": "fetch_combined_hot_news",
+          "description": "聚合微博、新浪、知乎、B站实时热搜榜单"
+        }
+      ]
+    },
+    "wechat-article": {
+      "command": "python",
+      "args": [
+        "-m",
+        "plugins.wechat_tools"
+      ],
+      "description": "微信公众号文章深度提取与传播分析 MCP",
+      "tools": [
+        {
+          "name": "fetch_wechat_article_content",
+          "description": "提取微信文章正文、标题与排版结构"
+        },
+        {
+          "name": "analyze_article_structure",
+          "description": "分析文章逻辑与金句亮点"
+        }
+      ]
+    },
+    "local-rag": {
+      "command": "python",
+      "args": [
+        "-m",
+        "plugins.knowledge_base_tools"
+      ],
+      "description": "本地 RAG 知识库与文档问答 MCP",
+      "tools": [
+        {
+          "name": "query_knowledge_base",
+          "description": "查询本地向量知识库"
+        },
+        {
+          "name": "add_document_to_knowledge_base",
+          "description": "添加文档至知识库并建立索引"
+        }
+      ]
+    },
+    "doc-processor": {
+      "command": "python",
+      "args": [
+        "-m",
+        "plugins.file_tools"
+      ],
+      "description": "Word & PDF 智能文档处理大师 MCP",
+      "tools": [
+        {
+          "name": "read_and_analyze_pdf",
+          "description": "读取并结构化分析 PDF 文件"
+        },
+        {
+          "name": "modify_or_create_word_doc",
+          "description": "读取、修改或新建 Word (.docx) 文档"
+        }
+      ]
+    }
+  }
+}
