@@ -5,7 +5,7 @@
 import sqlite3
 import contextlib
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -80,6 +80,60 @@ class MemoryManager:
             conn.commit()
             return cursor.lastrowid
 
+    def cleanup_empty_sessions(self):
+        """清理没有任何消息记录的历史空会话"""
+        with self._db_session() as conn:
+            conn.execute("""
+                DELETE FROM sessions 
+                WHERE id NOT IN (SELECT DISTINCT session_id FROM messages)
+            """)
+            conn.commit()
+
+    def cleanup_expired_history(self, days: int = 25) -> Dict[str, int]:
+        """
+        自动清理超过指定天数（默认 25 天）的历史会话与消息记录。
+        返回清理统计：{"deleted_sessions": n, "deleted_messages": m, "deleted_conversations": c}
+        """
+        if days <= 0:
+            return {"deleted_sessions": 0, "deleted_messages": 0, "deleted_conversations": 0}
+
+        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+        deleted_sessions = 0
+        deleted_msgs = 0
+        deleted_convs = 0
+
+        with self._db_session() as conn:
+            # 1. 查找所有 updated_at 或 created_at 早于 cutoff 的过期会话
+            rows = conn.execute(
+                "SELECT id FROM sessions WHERE (updated_at IS NOT NULL AND updated_at < ?) OR (updated_at IS NULL AND created_at < ?)",
+                (cutoff, cutoff)
+            ).fetchall()
+            expired_ids = [r[0] for r in rows]
+
+            if expired_ids:
+                placeholders = ",".join("?" * len(expired_ids))
+                # 级联删除 messages
+                cur_msg = conn.execute(f"DELETE FROM messages WHERE session_id IN ({placeholders})", expired_ids)
+                deleted_msgs = cur_msg.rowcount if cur_msg.rowcount >= 0 else len(expired_ids)
+                # 删除 sessions
+                cur_sess = conn.execute(f"DELETE FROM sessions WHERE id IN ({placeholders})", expired_ids)
+                deleted_sessions = cur_sess.rowcount if cur_sess.rowcount >= 0 else len(expired_ids)
+
+            # 2. 清理遗留 conversations 表中早于 cutoff 的记录
+            cur_conv = conn.execute("DELETE FROM conversations WHERE timestamp < ?", (cutoff,))
+            deleted_convs = cur_conv.rowcount if cur_conv.rowcount >= 0 else 0
+
+            conn.commit()
+
+        # 3. 回收可能遗留的空会话
+        self.cleanup_empty_sessions()
+
+        return {
+            "deleted_sessions": deleted_sessions,
+            "deleted_messages": deleted_msgs,
+            "deleted_conversations": deleted_convs
+        }
+
     def get_all_sessions(self) -> List[Dict]:
         """获取所有历史会话列表"""
         with self._db_session() as conn:
@@ -90,6 +144,17 @@ class MemoryManager:
             {"id": r[0], "title": r[1], "workspace_name": r[2] or "", "created_at": r[3], "updated_at": r[4]}
             for r in rows
         ]
+
+    def get_session(self, session_id: int) -> Optional[Dict]:
+        """获取单个历史会话信息"""
+        with self._db_session() as conn:
+            row = conn.execute(
+                "SELECT id, title, workspace_name, created_at, updated_at FROM sessions WHERE id = ?",
+                (session_id,)
+            ).fetchone()
+        if not row:
+            return None
+        return {"id": row[0], "title": row[1], "workspace_name": row[2] or "", "created_at": row[3], "updated_at": row[4]}
 
     def update_session_workspace(self, session_id: int, workspace_name: str):
         """更新会话归属的工作空间"""
@@ -137,12 +202,46 @@ class MemoryManager:
             for r in rows
         ]
 
+    def delete_message(self, message_id: int):
+        """删除指定 ID 的单条消息"""
+        with self._db_session() as conn:
+            conn.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+            conn.commit()
+
+    def delete_last_assistant_message(self, session_id: int):
+        """删除指定会话中最后一条 assistant 消息（重试时使用）"""
+        with self._db_session() as conn:
+            row = conn.execute(
+                "SELECT id FROM messages WHERE session_id = ? AND role = 'assistant' ORDER BY id DESC LIMIT 1",
+                (session_id,)
+            ).fetchone()
+            if row:
+                conn.execute("DELETE FROM messages WHERE id = ?", (row[0],))
+                conn.commit()
+
     def delete_session(self, session_id: int):
         """删除指定会话及其所有消息"""
         with self._db_session() as conn:
             conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
             conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
             conn.commit()
+
+    def delete_sessions_by_workspace(self, workspace_name: str) -> List[int]:
+        """删除指定工作空间下的所有任务会话及其全部消息，并返回被删除的 session_id 列表"""
+        if not workspace_name:
+            return []
+        with self._db_session() as conn:
+            rows = conn.execute(
+                "SELECT id FROM sessions WHERE workspace_name = ?",
+                (workspace_name,)
+            ).fetchall()
+            deleted_ids = [r[0] for r in rows]
+            if deleted_ids:
+                placeholders = ",".join("?" * len(deleted_ids))
+                conn.execute(f"DELETE FROM messages WHERE session_id IN ({placeholders})", deleted_ids)
+                conn.execute(f"DELETE FROM sessions WHERE id IN ({placeholders})", deleted_ids)
+                conn.commit()
+        return deleted_ids
 
     def clear_session_messages(self, session_id: int):
         """清空某个会话的消息"""

@@ -70,7 +70,7 @@ def get_city_weather(city: str = "广州") -> str:
     try:
         import httpx
         url = f"https://wttr.in/{clean_city}?format=j1"
-        resp = httpx.get(url, timeout=4.0, headers={"User-Agent": "NovaDesk/3.0"})
+        resp = httpx.get(url, timeout=4.0, headers={"User-Agent": "NovaDesk/4.0"})
         if resp.status_code == 200:
             data = resp.json()
             curr = data.get("current_condition", [{}])[0]

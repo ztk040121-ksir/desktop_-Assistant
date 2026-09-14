@@ -18,7 +18,16 @@ import json
 import ctypes
 from pathlib import Path
 
-# Windows App ID
+# Windows High-DPI Per-Monitor V2 Awareness & App ID
+try:
+    # 启用 Windows 原生 Per-Monitor V2 DPI 感知，彻底禁止系统级位图模糊插值拉伸
+    ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+except Exception:
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        pass
+
 try:
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("mycompany.desktools.pet.v2")
 except Exception:
@@ -26,18 +35,24 @@ except Exception:
 
 try:
     from PyQt5.QtCore import Qt, QCoreApplication
-    if hasattr(Qt, 'AA_EnableHighDpiScaling'):
-        from PyQt5.QtWidgets import QApplication
-        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
-    from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile
     from PyQt5.QtWidgets import QApplication
-    from PyQt5.QtGui import QIcon
+    from PyQt5.QtGui import QIcon, QFont
+    # 全局开启 Qt 高分屏动态缩放与高清 Pixmap 采样
+    if hasattr(Qt, 'AA_EnableHighDpiScaling'):
+        QCoreApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
+        QCoreApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    # 支持 125%、150% 等非整数缩放平滑穿透，杜绝四舍五入为 100% 导致大屏上变极小
+    if hasattr(Qt, 'HighDpiScaleFactorRoundingPolicy') and hasattr(QApplication, 'setHighDpiScaleFactorRoundingPolicy'):
+        QApplication.setHighDpiScaleFactorRoundingPolicy(
+            Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+        )
+    from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile
 except ImportError:
     try:
         from PyQt6.QtWidgets import QApplication
         from PyQt6.QtCore import Qt, QCoreApplication
-        from PyQt6.QtGui import QIcon
+        from PyQt6.QtGui import QIcon, QFont
     except Exception:
         pass
 
@@ -85,6 +100,11 @@ def main():
     _GLOBAL_APP = QApplication(sys.argv)
     _GLOBAL_APP.setQuitOnLastWindowClosed(False)
 
+    # 全局字体注入 ClearType 次像素平滑抗锯齿策略，确保字体锐利饱满无毛刺
+    app_font = QFont("Microsoft YaHei UI", 9)
+    app_font.setStyleStrategy(QFont.PreferAntialias | QFont.PreferQuality)
+    _GLOBAL_APP.setFont(app_font)
+
     try:
         profile = QWebEngineProfile.defaultProfile()
         profile.setHttpCacheType(QWebEngineProfile.MemoryHttpCache)
@@ -96,11 +116,20 @@ def main():
         _GLOBAL_APP.setWindowIcon(QIcon(str(ICON_PATH)))
 
     memory_manager = MemoryManager(DB_PATH)
+    try:
+        retention_days = config.get("behavior", {}).get("history_retention_days") or config.get("history_retention_days", 25)
+        clean_res = memory_manager.cleanup_expired_history(days=retention_days)
+        if clean_res.get("deleted_sessions") or clean_res.get("deleted_messages"):
+            print(f"[Main] 启动自动清理超过 {retention_days} 天的历史会话/消息: {clean_res}")
+    except Exception as _ce:
+        print(f"[Main] 自动清理过期历史失败: {_ce}")
+
     ai_engine = AIEngine(config)
     emotion_system = EmotionSystem()
     voice_input = VoiceInput(config)
     voice_output = VoiceOutput(config)
     plugin_manager = PluginManager(PLUGINS_DIR, config, ai_engine)
+    plugin_manager.load_all()
     
     ai_engine.set_dependencies(memory=memory_manager, emotion=emotion_system, plugins=plugin_manager)
 
@@ -123,7 +152,7 @@ def main():
     _GLOBAL_PET.tray_icon = _GLOBAL_TRAY
 
     print("==================================================")
-    print("Desktop AI Assistant (NovaDesk v3.0) Running!")
+    print("Desktop AI Assistant (NovaDesk v4.0) Running!")
     print("==================================================")
 
     sys.exit(_GLOBAL_APP.exec_())

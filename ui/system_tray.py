@@ -5,12 +5,12 @@
 from pathlib import Path
 try:
     from PyQt5.QtWidgets import QSystemTrayIcon, QMenu, QApplication
-    from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor
-    from PyQt5.QtCore import Qt
+    from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QCursor
+    from PyQt5.QtCore import Qt, QEvent
 except ImportError:
     from PyQt6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
-    from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor
-    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QCursor
+    from PyQt6.QtCore import Qt, QEvent
 
 ROOT_DIR = Path(__file__).parent.parent
 
@@ -26,6 +26,20 @@ def create_fallback_icon():
     return QIcon(pixmap)
 
 
+class AutoCloseMenu(QMenu):
+    """自定义防残留托盘菜单：失去焦点或点击外部时 100% 可靠自关闭"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(self.windowFlags() | Qt.Popup | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+
+    def changeEvent(self, event):
+        if event.type() == QEvent.ActivationChange:
+            if not self.isActiveWindow():
+                self.close()
+        super().changeEvent(event)
+
+
 class SystemTray(QSystemTrayIcon):
     def __init__(self, app, pet_window, config, save_config_fn):
         super().__init__()
@@ -34,6 +48,13 @@ class SystemTray(QSystemTrayIcon):
         self.config = config
         self.save_config_fn = save_config_fn
 
+        # 关联托盘到桌宠双向引用
+        if self.pet:
+            self.pet.tray = self
+            self.pet.tray_icon = self
+
+        self._is_dark = (self.config.get("ui_theme", "light") == "dark")
+
         icon_path = ROOT_DIR / "assets" / "icons" / "app_logo.png"
         if icon_path.exists():
             self.setIcon(QIcon(str(icon_path)))
@@ -41,67 +62,119 @@ class SystemTray(QSystemTrayIcon):
             self.setIcon(create_fallback_icon())
 
         pet_name = self.config.get("behavior", {}).get("pet_name", "桃濑日和")
-        app_ver = self.config.get("app_version", "v3.0")
+        app_ver = self.config.get("app_version", "v4.0")
         self.setToolTip(f"NovaDesk {app_ver} · AI 桌面智能助理 ({pet_name})")
         self._init_menu()
 
-        # 双击托盘图标立即唤醒并显示桌宠！
+        # 双击/单击托盘图标立即唤醒并显示桌宠
         self.activated.connect(self._on_tray_activated)
         self.show()
 
+    def set_theme(self, is_dark: bool):
+        """外部同步深浅色主题"""
+        self._is_dark = is_dark
+        self._apply_menu_theme()
+
     def _on_tray_activated(self, reason):
-        # 单击或双击托盘图标唤醒桌宠
         if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
             if self.pet:
-                self.pet.show()
-                self.pet.raise_()
-                self.pet.activateWindow()
+                if hasattr(self.pet, 'set_pet_visible'):
+                    self.pet.set_pet_visible(True, persist=True)
+                else:
+                    self.pet.show()
+                    self.pet.raise_()
+                    self.pet.activateWindow()
+        elif reason == QSystemTrayIcon.Context:
+            self._popup_menu()
+
+    def _apply_menu_theme(self):
+        """遵循主对话窗口现代极简设计规范（支持黑白双主题自适应，保持原有图标）"""
+        d = self._is_dark
+        bg = "#1e1e20" if d else "#ffffff"
+        fg = "#f4f4f5" if d else "#0f172a"
+        border = "#2e2e32" if d else "#e2e8f0"
+        item_hover_bg = "#2a2a2d" if d else "#f1f5f9"
+        item_hover_fg = "#ffffff" if d else "#0f172a"
+        sep_bg = "#2e2e32" if d else "#e2e8f0"
+
+        if hasattr(self, 'menu') and self.menu:
+            self.menu.setStyleSheet(f"""
+                QMenu {{
+                    background-color: {bg};
+                    color: {fg};
+                    border: 1px solid {border};
+                    border-radius: 12px;
+                    padding: 6px 5px;
+                    font-family: -apple-system, 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
+                    font-size: 12.5px;
+                    font-weight: 500;
+                }}
+                QMenu::item {{
+                    padding: 7px 20px;
+                    border-radius: 6px;
+                    background-color: transparent;
+                }}
+                QMenu::item:selected {{
+                    background-color: {item_hover_bg};
+                    color: {item_hover_fg};
+                }}
+                QMenu::separator {{
+                    height: 1px;
+                    background: {sep_bg};
+                    margin: 4px 6px;
+                }}
+            """)
 
     def _init_menu(self):
-        menu = QMenu()
-        menu.setStyleSheet("""
-            QMenu {
-                background: rgba(22, 20, 42, 245);
-                color: #eae8f8;
-                border: 1px solid rgba(160, 130, 255, 0.35);
-                border-radius: 10px;
-                padding: 6px;
-                font-family: 'Microsoft YaHei UI';
-                font-size: 13px;
-            }
-            QMenu::item {
-                padding: 7px 22px;
-                border-radius: 6px;
-            }
-            QMenu::item:selected {
-                background: rgba(140, 110, 255, 0.35);
-                color: #ffffff;
-            }
-            QMenu::separator {
-                height: 1px;
-                background: rgba(160, 130, 255, 0.2);
-                margin: 4px 6px;
-            }
-        """)
+        self.menu = AutoCloseMenu()
+        self._apply_menu_theme()
 
-        menu.addAction("🌸 显示桌宠", self._show_pet)
-        menu.addAction("💬 开启对话", self._open_chat)
-        menu.addAction("⚙️ 控制与设置", self._open_settings)
-        menu.addSeparator()
-        menu.addAction("❌ 退出程序", QApplication.quit)
+        self.menu.addAction("🌸 显示桌宠", self._show_pet)
+        self.menu.addAction("💬 开启对话", self._open_chat)
+        self.menu.addAction("⚙️ 控制与设置", self._open_settings)
+        self.menu.addSeparator()
+        self.menu.addAction("❌ 退出程序", QApplication.quit)
 
-        self.setContextMenu(menu)
+        self.setContextMenu(self.menu)
+
+    def _popup_menu(self):
+        # 弹出前与当前最新主题严格同步
+        if self.pet and hasattr(self.pet, 'chat_window') and self.pet.chat_window:
+            self._is_dark = getattr(self.pet.chat_window, '_is_dark', self._is_dark)
+        elif self.config:
+            self._is_dark = (self.config.get("ui_theme", "light") == "dark")
+        self._apply_menu_theme()
+
+        try:
+            import ctypes
+            hwnd = int(self.menu.winId()) if hasattr(self.menu, 'winId') else 0
+            if hwnd:
+                ctypes.windll.user32.SetForegroundWindow(hwnd)
+        except Exception:
+            pass
+        self.menu.exec_(QCursor.pos())
 
     def _show_pet(self):
         if self.pet:
-            self.pet.show()
-            self.pet.raise_()
-            self.pet.activateWindow()
+            if hasattr(self.pet, 'set_pet_visible'):
+                self.pet.set_pet_visible(True, persist=True)
+            else:
+                self.pet.show()
+                self.pet.raise_()
+                self.pet.activateWindow()
 
     def _open_chat(self):
         if self.pet:
             self.pet._open_chat()
 
     def _open_settings(self):
-        if self.pet and hasattr(self.pet, 'chat_window'):
-            self.pet.chat_window.open_settings()
+        if self.pet:
+            if hasattr(self.pet, '_open_settings'):
+                self.pet._open_settings()
+            elif hasattr(self.pet, 'chat_window') and self.pet.chat_window:
+                if hasattr(self.pet.chat_window, 'open_settings'):
+                    self.pet.chat_window.open_settings()
+                elif hasattr(self.pet.chat_window, '_switch_nav'):
+                    self.pet.chat_window._switch_nav(3)
+                elif hasattr(self.pet.chat_window, '_switch_view'):
+                    self.pet.chat_window._switch_view(2)

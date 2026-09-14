@@ -10,6 +10,7 @@
 """
 import os
 import re
+import ast
 import csv
 import json
 from pathlib import Path
@@ -73,9 +74,28 @@ def _format_file_card(file_path: Path, summary_text: str, ops_details: List[str]
 {summary_text}"""
 
 
+def _verify_excel_code_ast(code_str: str) -> Optional[str]:
+    """AST 语法树层级检查，防止沙箱逃逸与任意外部文件读写"""
+    try:
+        tree = ast.parse(code_str)
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                return "🛡️ 沙箱安全拦截：Excel 动态代码中禁止 import 导包操作。"
+            if isinstance(node, ast.Attribute):
+                if node.attr.startswith("__"):
+                    return f"🛡️ 沙箱安全拦截：禁止访问私有或底层属性 `{node.attr}`。"
+                if node.attr in ("load_workbook", "save", "save_to_file"):
+                    return f"🛡️ 沙箱安全拦截：禁止在代码中自行调用 `{node.attr}`（表格由安全执行器自动托管保存）。"
+            if isinstance(node, ast.Name) and node.id in ("eval", "exec", "__import__", "open", "compile", "globals", "locals", "system", "load_workbook"):
+                return f"🛡️ 沙箱安全拦截：禁止调用高危或未授权函数 `{node.id}`。"
+        return None
+    except Exception as e:
+        return f"❌ Python 语法解析错误：{e}"
+
+
 @register_tool(description="AI 动态代码解释器(Code Interpreter)：在沙箱中动态执行 openpyxl Python 代码，实现对 Excel 表格的任意复杂修改、多列合并、跨列计算、高亮格式化与排版。参数：file_path(表格路径), python_code(由 AI 自主编写的 openpyxl Python 处理代码)")
 def execute_excel_code(file_path: str = "", python_code: str = "") -> str:
-    """动态执行 AI 编写的 openpyxl 代码"""
+    """动态执行 AI 编写的 openpyxl 代码（带 AST 沙箱防护与路径隔离）"""
     err = check_sandbox_path(file_path)
     if err:
         return err
@@ -90,24 +110,6 @@ def execute_excel_code(file_path: str = "", python_code: str = "") -> str:
             if not clean_p:
                 return "❌ 未找到 Excel 文件~"
 
-        target_file = Path(clean_p)
-        wb = openpyxl.load_workbook(str(target_file))
-        ws = wb.active
-
-        local_scope = {
-            "wb": wb,
-            "ws": ws,
-            "openpyxl": openpyxl,
-            "Font": Font,
-            "Alignment": Alignment,
-            "PatternFill": PatternFill,
-            "Border": Border,
-            "Side": Side,
-            "Path": Path,
-            "re": re,
-            "target_file": target_file
-        }
-
         code_to_exec = python_code.strip()
         if code_to_exec.startswith("```python"):
             code_to_exec = code_to_exec[9:]
@@ -116,7 +118,38 @@ def execute_excel_code(file_path: str = "", python_code: str = "") -> str:
         if code_to_exec.endswith("```"):
             code_to_exec = code_to_exec[:-3]
 
-        exec(code_to_exec, {}, local_scope)
+        # 1. AST 深度安全审查
+        ast_err = _verify_excel_code_ast(code_to_exec)
+        if ast_err:
+            return ast_err
+
+        target_file = Path(clean_p)
+        wb = openpyxl.load_workbook(str(target_file))
+        ws = wb.active
+
+        # 2. 纯净受限环境，阻止默认注入任意 __builtins__
+        safe_builtins = {
+            'abs': abs, 'all': all, 'any': any, 'dict': dict, 'enumerate': enumerate,
+            'float': float, 'int': int, 'isinstance': isinstance, 'len': len, 'list': list,
+            'max': max, 'min': min, 'print': print, 'range': range, 'round': round,
+            'set': set, 'str': str, 'sum': sum, 'tuple': tuple, 'zip': zip,
+            'True': True, 'False': False, 'None': None,
+            'Exception': Exception, 'ValueError': ValueError, 'TypeError': TypeError,
+            'KeyError': KeyError, 'IndexError': IndexError
+        }
+
+        local_scope = {
+            "wb": wb,
+            "ws": ws,
+            "Font": Font,
+            "Alignment": Alignment,
+            "PatternFill": PatternFill,
+            "Border": Border,
+            "Side": Side,
+            "re": re
+        }
+
+        exec(code_to_exec, {"__builtins__": safe_builtins}, local_scope)
 
         saved_file = target_file
         try:
@@ -133,11 +166,12 @@ def execute_excel_code(file_path: str = "", python_code: str = "") -> str:
 
         return _format_file_card(
             saved_file,
-            "🌸 AI 智能代码解释器已成功执行处理，并在桌面上保存打开！",
-            ["执行动态表格处理脚本", f"自动更新电子表格：{saved_file.name}"]
+            "🌸 AI 智能代码解释器已成功安全执行处理并保存！",
+            ["安全沙箱 AST 静态审查通过", f"自动更新电子表格：{saved_file.name}"]
         )
     except Exception as e:
         return f"❌ 动态代码执行异常：{e}"
+
 
 
 @register_tool(description="根据自然语言指令，对指定的 Excel 电子表格执行一揽子复合处理（支持查找替换姓名/数值、合并单元格/合并列、数据排序、求和计算等）。参数：file_path(表格完整路径), instruction(用户的具体处理需求)")
@@ -370,9 +404,15 @@ def process_excel_file(file_path: str = "", instruction: str = "") -> str:
                         except Exception:
                             pass
                     else:
-                        # 文本匹配高亮
-                        for keyword in ["已发放", "技术研发部", "旷镇涛", "旷文涵"]:
-                            if keyword in instruction and keyword in str(val):
+                        # 动态从用户指令中提取需匹配的高亮关键词
+                        kw_matches = re.findall(r'[“"「]([^”"」\s，,]+)[”"」]', instruction)
+                        if not kw_matches:
+                            # 提取指令中非颜色与操作词的关键词
+                            for token in re.split(r'[,，\s、]', instruction):
+                                if len(token) >= 2 and token not in ["高亮", "标记", "标黄", "标红", "绿色", "背景", "单元格", "这一列", "整列"]:
+                                    kw_matches.append(token)
+                        for keyword in kw_matches:
+                            if keyword in str(val):
                                 cell.fill = fill
                                 hl_count += 1
 
@@ -487,17 +527,44 @@ def create_excel_table(file_path: str = "1.xlsx", title: str = "员工工资统�
         ws = wb.active
         ws.title = title[:30] if title else "数据表"
 
-        header_list = ["工号", "员工姓名", "所属部门", "基本工资(元)", "绩效奖金(元)", "社保公积金(元)", "个税(元)", "实发工资(元)", "发放状态"]
-        rows = [
-            ["EMP001", "张伟", "技术研发部", 15000, 4500, 2200, 850, 16450, "已发放"],
-            ["EMP002", "李娜", "产品运营部", 13500, 3800, 1950, 680, 14670, "已发放"],
-            ["EMP003", "王敏", "市场商务部", 12000, 6200, 1800, 720, 15680, "已发放"],
-            ["EMP004", "刘洋", "技术研发部", 18000, 5500, 2600, 1250, 19650, "已发放"],
-            ["EMP005", "陈静", "财务行政部", 11000, 2500, 1650, 450, 11400, "已发放"],
-            ["EMP006", "赵强", "售后服务部", 9500, 3000, 1400, 320, 10780, "已发放"]
-        ]
+        # 动态解析表头与数据行
+        header_list = []
         if headers:
-            header_list = [h.strip() for h in headers.split(",") if h.strip()]
+            if isinstance(headers, list):
+                header_list = [str(h).strip() for h in headers if str(h).strip()]
+            else:
+                header_list = [h.strip() for h in str(headers).split(",") if h.strip()]
+
+        rows = []
+        if rows_data:
+            if isinstance(rows_data, list):
+                rows = rows_data
+            else:
+                try:
+                    parsed_rows = json.loads(rows_data)
+                    if isinstance(parsed_rows, list):
+                        if parsed_rows and isinstance(parsed_rows[0], dict):
+                            if not header_list:
+                                header_list = list(parsed_rows[0].keys())
+                            rows = [[r.get(k, "") for k in header_list] for r in parsed_rows]
+                        elif parsed_rows and isinstance(parsed_rows[0], list):
+                            rows = parsed_rows
+                except Exception:
+                    # CSV 纯文本按行拆分
+                    for line in str(rows_data).strip().splitlines():
+                        line = line.strip()
+                        if line:
+                            items = [i.strip() for i in re.split(r'[,，\t]', line)]
+                            rows.append(items)
+
+        if not header_list:
+            header_list = ["序号", "项目名称", "分类", "数值", "状态", "备注"]
+
+        if not rows:
+            rows = [
+                ["1", "示例项目A", "常规类别", 1000, "进行中", "正常"],
+                ["2", "示例项目B", "重点类别", 2500, "已完成", "优先"]
+            ]
 
         # 写入大标题
         ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(header_list))

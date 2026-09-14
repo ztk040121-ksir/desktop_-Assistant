@@ -1,11 +1,68 @@
+# -*- coding: utf-8 -*-
 """
-微信助手工具集 - 截图识别微信消息并回复
-采用视觉方案（pyautogui截图 + AI识别），安全不封号
+微信桌面助手工具集 (WeChat Automation Tools)
+支持微信窗口检测、置顶、Unicode 剪贴板安全暂存/注入、以及消息自动化发送
 """
 import time
 import subprocess
 from pathlib import Path
 from core.plugin_manager import register_tool
+
+
+def _get_clipboard_text() -> str:
+    """获取当前系统剪贴板文本（用于备份）"""
+    try:
+        import win32clipboard
+        import win32con
+        win32clipboard.OpenClipboard()
+        if win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
+            data = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
+            win32clipboard.CloseClipboard()
+            return data or ""
+        win32clipboard.CloseClipboard()
+    except Exception:
+        pass
+    try:
+        import pyperclip
+        return pyperclip.paste() or ""
+    except Exception:
+        pass
+    return ""
+
+
+def _set_clipboard_text(text: str) -> bool:
+    """写入 Unicode 文本至系统剪贴板（100% 支持中文字符与长文本）"""
+    # 方式 1: pywin32 win32clipboard
+    try:
+        import win32clipboard
+        import win32con
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardText(text, win32con.CF_UNICODETEXT)
+        win32clipboard.CloseClipboard()
+        return True
+    except Exception:
+        pass
+
+    # 方式 2: pyperclip
+    try:
+        import pyperclip
+        pyperclip.copy(text)
+        return True
+    except Exception:
+        pass
+
+    # 方式 3: PyQt5
+    try:
+        from PyQt5.QtWidgets import QApplication
+        app = QApplication.instance()
+        if app:
+            app.clipboard().setText(text)
+            return True
+    except Exception:
+        pass
+
+    return False
 
 
 def _find_wechat_window():
@@ -19,12 +76,12 @@ def _find_wechat_window():
         result = []
         win32gui.EnumWindows(callback, result)
         return result[0] if result else None
-    except ImportError:
+    except Exception:
         return None
 
 
 def _bring_wechat_to_front():
-    """将微信窗口置顶"""
+    """将微信窗口激活并置顶在前台"""
     try:
         import win32gui
         import win32con
@@ -32,129 +89,120 @@ def _bring_wechat_to_front():
         if hwnd:
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
             win32gui.SetForegroundWindow(hwnd)
-            time.sleep(0.5)
-            return True
-        return False
+            time.sleep(0.4)
+            return hwnd
+        return None
     except Exception:
-        return False
+        return None
 
 
-@register_tool(description="截取微信窗口截图并分析其中的消息内容，返回消息摘要")
+@register_tool(description="截取微信当前窗口屏幕并保存为图像文件。")
 def read_wechat_messages() -> str:
-    """
-    截取微信窗口，用 AI 识别消息内容
-    需要微信已打开并在桌面上可见
-    """
+    """截取微信窗口截图"""
     try:
         import pyautogui
-        from PIL import Image
-        import tempfile, os
+        import tempfile
 
-        # 尝试将微信置顶
-        _bring_wechat_to_front()
+        hwnd = _bring_wechat_to_front()
         time.sleep(0.5)
 
-        # 截取全屏
         screenshot = pyautogui.screenshot()
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             tmp_path = tmp.name
             screenshot.save(tmp_path)
 
         return (
-            f"✅ 已截取屏幕截图，截图保存在：{tmp_path}\n"
-            "（注意：要让 AI 分析图片内容，需要配置视觉模型 qwen2.5vl:7b）\n"
-            "你可以对我说：'帮我看看这张截图里微信有什么消息'"
+            f"✅ 已成功截取微信窗口屏幕，截图保存于：`{tmp_path}`\n"
+            "💡 *提示：要让 AI 深度识别并提炼图片中的聊天文字，请在设置中配置视觉多模态大模型（如 Qwen2.5-VL / DeepSeek-VL）。*"
         )
     except Exception as e:
-        return f"截图失败：{e}"
+        return f"❌ 微信截图失败：{e}"
 
 
-@register_tool(description="打开微信应用程序")
+@register_tool(description="打开微信桌面客户端应用程序。")
 def open_wechat() -> str:
     """打开微信"""
     wechat_paths = [
         r"C:\Program Files (x86)\Tencent\WeChat\WeChat.exe",
         r"C:\Program Files\Tencent\WeChat\WeChat.exe",
         r"D:\Program Files (x86)\Tencent\WeChat\WeChat.exe",
+        r"D:\Program Files\Tencent\WeChat\WeChat.exe"
     ]
     for path in wechat_paths:
         if Path(path).exists():
             subprocess.Popen([path])
-            return "✅ 微信已打开"
+            return "✅ 微信客户端已成功启动！"
 
-    # 尝试通过开始菜单打开
     try:
         subprocess.Popen(["explorer.exe", "shell:AppsFolder\\com.tencent.weixin_..."])
-        return "✅ 正在打开微信..."
+        return "✅ 正在通过应用快捷方式启动微信..."
     except Exception:
         pass
 
-    return "⚠️ 未找到微信，请确认微信已安装。常见路径：C:\\Program Files (x86)\\Tencent\\WeChat\\WeChat.exe"
+    return "⚠️ 未在常见路径找到微信，请确认微信已安装并正在运行。"
 
 
-@register_tool(description="向微信中指定联系人发送消息，参数：联系人名称、消息内容")
+@register_tool(description="向微信中指定的中文联系人/好友/群聊发送消息。参数：contact_name(联系人或群名称)，message(需要发送的消息文本)")
 def send_wechat_message(contact_name: str, message: str) -> str:
-    """
-    通过 pyautogui 操作微信界面发送消息
-    流程：搜索联系人 → 点击 → 输入消息 → 发送
-    """
+    """向微信联系人发送消息（支持中文联系人、并在发送后自动恢复用户原有剪贴板内容）"""
+    c_name = contact_name.strip()
+    msg = message.strip()
+    if not c_name or not msg:
+        return "⚠️ 请提供有效的联系人名称和消息内容。"
+
+    # 1. 备份用户原有剪贴板内容
+    user_clip_backup = _get_clipboard_text()
+
     try:
         import pyautogui
 
-        # 1. 确保微信在前台
-        if not _bring_wechat_to_front():
-            return "⚠️ 微信未打开，请先打开微信"
+        # 2. 激活微信到前台
+        hwnd = _bring_wechat_to_front()
+        if not hwnd:
+            return "⚠️ 微信客户端未启动或窗口不可见，请先登录并打开微信。"
 
+        time.sleep(0.5)
+
+        # 3. 搜索联系人 (Ctrl+F) 并通过剪贴板安全粘贴中文联系人名
+        pyautogui.hotkey("ctrl", "f")
+        time.sleep(0.3)
+        _set_clipboard_text(c_name)
+        pyautogui.hotkey("ctrl", "v")
         time.sleep(0.8)
 
-        # 2. 使用 Ctrl+F 搜索联系人
-        pyautogui.hotkey("ctrl", "f")
-        time.sleep(0.5)
-        pyautogui.write(contact_name, interval=0.05)
-        time.sleep(1.0)
-
-        # 3. 按 Enter 进入聊天
+        # 4. 回车选中第一个匹配项进入聊天窗口
         pyautogui.press("enter")
         time.sleep(0.5)
 
-        # 4. 点击输入框（大致位置，根据实际分辨率可能需要调整）
-        screen_w, screen_h = pyautogui.size()
-        # 微信输入框通常在窗口下方
-        pyautogui.click(screen_w // 2, screen_h - 150)
-        time.sleep(0.3)
-
-        # 5. 输入消息
-        # 使用剪贴板粘贴（避免输入法问题）
-        import subprocess
-        subprocess.run(
-            ["powershell", "-c", f"Set-Clipboard -Value '{message}'"],
-            capture_output=True
-        )
+        # 5. 写入消息文本并发送
+        _set_clipboard_text(msg)
         pyautogui.hotkey("ctrl", "v")
         time.sleep(0.3)
-
-        # 6. 发送
         pyautogui.press("enter")
-        time.sleep(0.3)
+        time.sleep(0.2)
 
-        return f"✅ 已向「{contact_name}」发送消息：{message[:50]}"
+        return f"✅ 已成功向微信好友/群聊「**{c_name}**」发送消息：\n> {msg[:80]}{('...' if len(msg) > 80 else '')}"
     except Exception as e:
-        return f"发送失败：{e}\n提示：请确保微信窗口可见且没有被其他窗口遮挡"
+        return f"❌ 微信消息发送异常：{e}\n*提示：请确保微信窗口处于前台且联系人名称准确。*"
+    finally:
+        # 6. 恢复用户原有剪贴板内容
+        if user_clip_backup:
+            _set_clipboard_text(user_clip_backup)
 
 
-@register_tool(description="检查微信是否正在运行")
+@register_tool(description="检查微信客户端当前是否处于运行状态。")
 def check_wechat_status() -> str:
-    """检查微信进程是否在运行"""
+    """检查微信进程与窗口状态"""
     try:
         result = subprocess.run(
             ["tasklist", "/FI", "IMAGENAME eq WeChat.exe"],
-            capture_output=True, text=True
+            capture_output=True, text=True, errors="ignore"
         )
         if "WeChat.exe" in result.stdout:
             hwnd = _find_wechat_window()
             if hwnd:
-                return "✅ 微信正在运行，且窗口可见"
-            return "✅ 微信正在运行（后台）"
-        return "❌ 微信未运行"
+                return "✅ 微信正在运行中，且窗口处于前台可用状态。"
+            return "✅ 微信正在后台运行中。"
+        return "❌ 微信客户端当前未运行。"
     except Exception as e:
-        return f"检查失败：{e}"
+        return f"检查状态失败：{e}"

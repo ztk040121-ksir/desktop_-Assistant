@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import List, Dict
 from core.plugin_manager import register_tool
 
-KB_DIR = Path(r"E:\Demo\desk_tools\data\knowledge_base")
+KB_DIR = Path(__file__).resolve().parent.parent / "data" / "knowledge_base"
 KB_INDEX_FILE = KB_DIR / "kb_index.json"
 
 
@@ -56,10 +56,19 @@ def add_document_to_knowledge_base(file_path: str) -> str:
         doc = docx.Document(str(p))
         text_content = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
     elif ext == ".pdf":
-        import pdfplumber
-        with pdfplumber.open(str(p)) as pdf:
-            pages_text = [page.extract_text() or "" for page in pdf.pages]
+        try:
+            import pypdf
+            reader = pypdf.PdfReader(str(p))
+            pages_text = [page.extract_text() or "" for page in reader.pages]
             text_content = "\n".join(pages_text)
+        except Exception:
+            try:
+                import pdfplumber
+                with pdfplumber.open(str(p)) as pdf:
+                    pages_text = [page.extract_text() or "" for page in pdf.pages]
+                    text_content = "\n".join(pages_text)
+            except Exception as e:
+                return f"❌ PDF 解析失败: {e}"
     else:
         return f"⚠️ 暂不支持的文件格式：{ext}"
 
@@ -107,7 +116,7 @@ def add_document_to_knowledge_base(file_path: str) -> str:
 
     return f"""📚 **【私有知识库入库成功】**
 📄 **文档名称**：`{p.name}`
-🧩 **知识切块**：已切分为 **{len(chunks)}** 个向量检索分块
+🧩 **知识切块**：已切分为 **{len(chunks)}** 个文本语义与关键词余弦相似度检索分块
 💾 **库内状态**：当前知识库共收录 **{len(index_data['documents'])}** 篇本地文档，随时可通过自然语言提问检索！"""
 
 

@@ -9,30 +9,10 @@ echo  正在安装 Python 依赖包...
 echo  （首次安装可能需要几分钟，请耐心等待）
 echo.
 
-:: 升级 pip
+:: 升级 pip 并从 requirements.txt 安装所有依赖
 python -m pip install --upgrade pip -q
-
-:: 安装核心 UI 依赖
-echo [1/6] 安装 PyQt6（UI框架）...
-pip install PyQt6 -q
-
-:: 安装 AI 依赖
-echo [2/6] 安装 HTTP 客户端...
-pip install httpx -q
-
-:: 安装语音相关
-echo [3/6] 安装语音识别（faster-whisper，支持GPU）...
-pip install faster-whisper -q
-
-echo [4/6] 安装语音合成（edge-tts）...
-pip install edge-tts -q
-
-echo [5/6] 安装音频录制（pyaudio）...
-pip install pyaudio -q
-
-:: 安装系统控制和文件处理
-echo [6/6] 安装其他工具包...
-pip install pyautogui pynput pywin32 Pillow python-docx openpyxl PyPDF2 -q
+echo 正在安装 requirements.txt 中定义的所有核心依赖包...
+python -m pip install -r requirements.txt
 
 echo.
 echo  ╔══════════════════════════════════════════════╗
@@ -45,3 +25,4 @@ echo  ║  模型将保存到: E:\Study_Cache\model\whisper   ║
 echo  ╚══════════════════════════════════════════════╝
 echo.
 pause
+

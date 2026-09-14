@@ -5,6 +5,12 @@
       "path": "E:\\Demo\\desk_tools\\config.json",
       "chunk_count": 5,
       "size_kb": 1.7
+    },
+    {
+      "name": "sample_kb.txt",
+      "path": "E:\\Demo\\desk_tools\\scratch\\sample_kb.txt",
+      "chunk_count": 1,
+      "size_kb": 0.1
     }
   ],
   "chunks": [
@@ -37,6 +43,12 @@
       "doc_path": "E:\\Demo\\desk_tools\\config.json",
       "chunk_id": 4,
       "text": "pacity\": 1.0\n  },\n  \"plugins\": {\n    \"enabled\": [\n      \"pet_controller\",\n      \"amap_life_tools\",\n      \"web_search_news\",\n      \"computer_control\",\n      \"file_tools\",\n      \"wechat_tools\",\n      \"github_tools\",\n      \"ppt_tools\",\n      \"knowledge_base_tools\",\n      \"creative_article_tools\"\n    ]\n  }\n}"
+    },
+    {
+      "doc_name": "sample_kb.txt",
+      "doc_path": "E:\\Demo\\desk_tools\\scratch\\sample_kb.txt",
+      "chunk_id": 0,
+      "text": "这是一篇关于 NovaDesk 桌面助手的架构说明文档，具备 Live2D 与多模型支持。"
     }
   ]
 }

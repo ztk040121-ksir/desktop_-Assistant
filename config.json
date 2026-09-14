@@ -1,6 +1,6 @@
 {
   "ai": {
-    "provider": "ollama",
+    "provider": "custom",
     "ollama": {
       "base_url": "http://localhost:11434",
       "chat_model": "deepseek-r1:14b",
@@ -42,46 +42,51 @@
     "emotion_system": true,
     "auto_speak_reply": false,
     "language": "zh-CN",
-    "sound_enabled": false
+    "sound_enabled": false,
+    "history_retention_days": 25
   },
   "pet": {
-    "position_x": 1186,
-    "position_y": 82,
+    "position_x": 1939,
+    "position_y": 224,
     "scale": 1.0,
     "character": "default",
     "always_on_top": false,
-    "opacity": 1.0
+    "opacity": 1.0,
+    "enabled": true
   },
   "plugins": {
     "enabled": [
-      "health_calculator_tools",
-      "web_search_news",
-      "kuaidi100_tools",
       "xiaohongshu_mcp_tools",
-      "ppt_tools",
-      "wechat_tools",
-      "amap_lbs",
-      "file_tools",
       "creative_article_tools",
-      "markdownify_tools",
-      "xhs_publisher_tools",
-      "github_tools",
-      "amap_life_tools",
       "ticket_12306_tools",
-      "knowledge_base_tools",
-      "chrome_devtools_tools",
+      "web_search_news",
+      "agent_dev_tools",
+      "doc_engineering_tools",
+      "github_tools",
+      "skill_dev_tools",
+      "ppt_tools",
+      "kuaidi100_tools",
       "computer_control",
+      "knowledge_base_tools",
+      "file_tools",
       "firecrawl_tools",
+      "wechat_tools",
+      "video_script_tools",
+      "chrome_devtools_tools",
+      "python_interpreter",
+      "amap_life_tools",
+      "health_calculator_tools",
       "pet_controller",
-      "docx_master"
+      "xhs_publisher_tools",
+      "markdownify_tools",
+      "web_dev_tools",
+      "cicd_tools"
     ]
   },
   "ui_theme": "dark",
   "sound_enabled": false,
   "workspace_path": "C:\\Users\\31665\\Desktop\\1",
-  "pinned_sessions": [
-    29
-  ],
+  "pinned_sessions": [],
   "archived_sessions": [
     14
   ],
@@ -133,40 +138,41 @@
     }
   ],
   "active_model_id": "model_deepseek_r1",
-  "model_display_name": "DeepSeek-V4 (OhMyGPT)",
-  "model_name": "deepseek:deepseek/deepseek-v4-flash-vision-exp",
-  "provider": "custom",
-  "api_base_url": "https://api.ohmygpt.com/v1",
-  "api_key": "sk-1FEAUBAdC6ee71Eaf9a3T3BLbkFJ6756Bd2A1B6B40B8aa77",
-  "system_prompt": "你是一个全能的桌面 AI 智能体助理。",
-  "app_name": "NovaDesk",
-  "app_version": "v3.0",
-  "permission_mode": "standard",
-  "workspace_dir": "E:/Demo/desk_tools/Agent开发",
   "active_model_name": "DeepSeek-R1 (14B 本地)",
+  "app_name": "NovaDesk",
+  "app_version": "v4.0",
+  "permission_mode": "full",
+  "workspace_dir": "C:\\Users\\31665\\Desktop\\测试",
   "workspaces": [
     {
-      "name": "Study笔记",
-      "path": "E:/Demo/desk_tools/Study笔记",
+      "name": "测试",
+      "path": "C:/Users/31665/Desktop/测试",
       "collapsed": false
-    },
-    {
-      "name": "Agent开发",
-      "path": "E:/Demo/desk_tools/Agent开发"
-    },
-    {
-      "name": "langchain_demo",
-      "path": "E:/Demo/desk_tools/langchain_demo"
-    },
-    {
-      "name": "tjxt",
-      "path": "E:/Demo/desk_tools/tjxt",
-      "collapsed": true
-    },
-    {
-      "name": "Spring_AI_MCP",
-      "path": "E:/Demo/desk_tools/Spring_AI_MCP"
     }
   ],
-  "current_workspace_name": "Agent开发"
+  "current_workspace_name": "测试",
+  "user_avatar_path": "E:\\Demo\\desk_tools\\data\\user_avatar.png",
+  "user_name": "旷镇涛",
+  "user_memo": "我喜欢玩无畏契约",
+  "pet_enabled": true,
+  "connected_connectors": [
+    "project_audit_mcp",
+    "workspace_db"
+  ],
+  "dev_active_persona": "fullstack_architect",
+  "dev_session_state": {
+    "workspace_dir": "C:\\Users\\31665\\Desktop\\测试",
+    "opened_files": [
+      "C:\\Users\\31665\\Desktop\\测试\\bubble_sort_example.py"
+    ],
+    "active_file": "C:\\Users\\31665\\Desktop\\测试\\bubble_sort_example.py",
+    "cursor_positions": {
+      "C:\\Users\\31665\\Desktop\\测试\\bubble_sort_example.py": 18
+    },
+    "timestamp": 1789386716.5559354
+  },
+  "dev_extension_dialog_size": [
+    1080,
+    760
+  ]
 }

@@ -1,5 +1,23 @@
 {
   "mcpServers": {
+    "local-sqlite-mcp": {
+      "command": "python",
+      "args": [
+        "-m",
+        "core.local_sqlite_mcp"
+      ],
+      "description": "本地高可用 SQLite 数据库查询与元数据分析 MCP 服务器（毫秒级响应、零网络依赖）",
+      "tools": [
+        {
+          "name": "sqlite_query",
+          "description": "执行 SQLite SQL 查询语句（支持 SELECT、INSERT、UPDATE、CREATE 等）并返回 JSON 结果"
+        },
+        {
+          "name": "sqlite_schema",
+          "description": "获取 SQLite 数据库所有表结构、字段类型与建表 SQL 元信息"
+        }
+      ]
+    },
     "mcp-server-firecrawl": {
       "command": "npx",
       "args": [

@@ -7,7 +7,10 @@ import tempfile
 import wave
 import os
 from typing import Callable, Optional
-import pyaudio
+try:
+    import pyaudio
+except ImportError:
+    pyaudio = None
 import struct
 
 
@@ -16,7 +19,7 @@ class VoiceInput:
 
     def __init__(self, config: dict):
         self.config = config
-        self.vc = config["voice"]
+        self.vc = config.get("voice", {})
         self.model = None
         self._recording = False
         self._model_loaded = False
@@ -25,7 +28,7 @@ class VoiceInput:
         self.SAMPLE_RATE = 16000
         self.CHANNELS = 1
         self.CHUNK = 1024
-        self.FORMAT = pyaudio.paInt16
+        self.FORMAT = pyaudio.paInt16 if pyaudio else 2
 
     def _load_model(self):
         """懒加载 Whisper 模型（首次使用时才加载，节省内存）"""
@@ -88,6 +91,9 @@ class VoiceInput:
 
     def _record_audio(self, max_seconds: int = 10) -> Optional[bytes]:
         """录制音频，检测静默自动停止"""
+        if not pyaudio:
+            print("⚠️ 未安装 pyaudio，无法使用麦克风录音")
+            return None
         self._recording = True
         pa = pyaudio.PyAudio()
         frames = []
